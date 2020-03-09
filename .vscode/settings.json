@@ -1,0 +1,4 @@
+{
+    "rust.show_warnings": true,
+    "debug.allowBreakpointsEverywhere": true
+}

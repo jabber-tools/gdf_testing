@@ -1,9 +1,13 @@
 [package]
-name = "gdf-testing"
+name = "gdf_testing"
+description = "CLI utility for testing of DialogFlow NLP powered chatbots"
 version = "0.1.0"
 authors = ["abezecny"]
 edition = "2018"
+default-run = "gdf_testing"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+yaml-rust = "0.4.3"
