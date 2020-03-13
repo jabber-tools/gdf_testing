@@ -14,9 +14,13 @@ fn main() {
           desc: 'Tests default welcome intent'
           assertions:
             - userSays: 'Hello'
-            - botRespondsWith:
-                - Welcome
-    ";        
+              botRespondsWith: ['Welcome']
+        - name: 'Default fallback intent'
+          desc: 'Tests default fallback intent'
+          assertions:
+            - userSays: 'wtf'
+              botRespondsWith: 'Fallback'
+    ";     
 
 
     gdf_testing::parse_yaml(yaml);

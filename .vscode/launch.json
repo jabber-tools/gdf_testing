@@ -19,17 +19,16 @@
             ]
         },
         {
-            "name": "Launch vap_main",
+            "name": "Example - dump yaml",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/target/debug/vap_main.exe",
+            "program": "${workspaceRoot}/target/debug/dump_yaml.exe",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "args": [
-                "--foo",
-                "--bar"
+                "./examples/sample.yaml"
             ]
         }        
     ]

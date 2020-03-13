@@ -1,6 +1,7 @@
 pub mod yaml {
 
     use yaml_rust::YamlLoader;
+    use yaml_rust::Yaml;
     use std::error::Error;
     use std::fmt;
 
@@ -44,11 +45,34 @@ pub mod yaml {
         bot_responds_with: Vec<String>
     }
 
+    impl TestAssertion {
+        pub fn new(user_says: String) -> Self {
+            TestAssertion {
+                user_says: user_says,
+                bot_responds_with: vec![]
+            }
+        }
+    }
+
     struct Test {
         name: String,
-        desc: String,
+        desc: Option<String>,
         assertions: Vec<TestAssertion>
-    }    
+    }
+    
+    impl Test {
+        pub fn new(name: String, desc: Option<String>) -> Self {
+            Test {
+                name: name,
+                desc: desc,
+                assertions: vec![]
+            }
+        }
+
+        pub fn set_assertions(&mut self, mut assertions: Vec<TestAssertion>) {
+            &self.assertions.append(&mut assertions);
+        }
+    }
 
     pub struct TestSuite {
         suite_spec: TestSuiteSpec,
@@ -78,6 +102,82 @@ pub mod yaml {
                 return Err(Box::new(YamlParsingError(format!("Suite credentials not specified"))));
             }
             
+            let tests = yaml["tests"].as_vec();
+            if let None = tests {
+                return Err(Box::new(YamlParsingError(format!("No tests specified"))));
+            }
+
+            let tests = tests.unwrap();
+            println!("number of tests {}", tests.len());
+
+            if tests.len() == 0 {
+                return Err(Box::new(YamlParsingError(format!("No tests specified"))));
+            }
+
+            let mut suite_tests: Vec<Test> = vec![];
+
+            for test in tests.iter() {
+
+                let test_name = test["name"].as_str();
+                let _test_desc = test["desc"].as_str(); //desc is optional
+                let test_assertions = test["assertions"].as_vec();
+                if let None = test_name {return Err(Box::new(YamlParsingError(format!("Test name not specified"))));}
+                
+                let test_to_push;
+
+                if let None = test_assertions {
+                    test_to_push = Test::new(test_name.unwrap().to_owned(), None);
+                    suite_tests.push(test_to_push);
+                } else {
+                    test_to_push = Test::new(test_name.unwrap().to_owned(), Some(_test_desc.unwrap().to_string()));
+                    suite_tests.push(test_to_push);
+                }
+
+                
+
+                let mut assertions_found = true;
+                if let None = test_assertions { assertions_found = false; }
+                let test_assertions = test_assertions.unwrap();
+                if test_assertions.len() == 0 { 
+                    assertions_found = false; 
+                }
+
+                if assertions_found == false {
+                    return Err(Box::new(YamlParsingError(format!("Test assertions not specified for {}", test_name.unwrap()))));
+                }
+
+                
+                let test_assertions_to_push: Vec<TestAssertion> = vec![];
+
+                for test_assertion in test_assertions.iter() {
+                    let user_says = test_assertion["userSays"].as_str();
+                    if let None = user_says {
+                        return Err(Box::new(YamlParsingError(format!("Test assertions missing userSays for {}", test_name.unwrap()))));
+                    }
+                    let user_says = user_says.unwrap();
+
+                    let bot_responds_with = test_assertion["botRespondsWith"].as_str();
+                    if let None = bot_responds_with {
+                        let bot_responds_with = test_assertion["botRespondsWith"].as_vec();
+                        if let None = bot_responds_with {
+                            return Err(Box::new(YamlParsingError(format!("Test assertions missing botRespondsWith for {}", test_name.unwrap()))));
+                        } else {
+                            let bot_responds_with = bot_responds_with.unwrap();
+
+                            for bot_responds_with_str in bot_responds_with.iter() {
+                                println!("bot_responds_with_str {}", bot_responds_with_str.as_str().unwrap());
+                            }
+
+                        }
+                    } else {
+                        let bot_responds_with = bot_responds_with.unwrap();
+                        println!("xixi {:?}", bot_responds_with);
+                    }
+                }
+
+                // test_to_push.set_assertions(test_assertions_to_push);
+
+            }
 
             Ok(
                 TestSuite {
@@ -93,10 +193,7 @@ pub mod yaml {
     }
 
     pub fn parse (yaml: &str) {
-        let docs = YamlLoader::load_from_str(yaml).unwrap();
-        let doc = &docs[0];
-        println!("yaml::parse {}", doc["suite-spec"]["name"].as_str().unwrap());
-        println!("yaml::parse {}", doc["tests"][0]["name"].as_str().unwrap());
+        TestSuite::new(yaml);
     }
 }
 
@@ -122,6 +219,11 @@ tests:
       assertions:
         - userSays: 'Hello'
           botRespondsWith: ['Welcome']
+    - name: 'Default fallback intent'
+      desc: 'Tests default fallback intent'
+      assertions:
+        - userSays: 'wtf'
+          botRespondsWith: ['Fallback']
 ";            
 
 
