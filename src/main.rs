@@ -1,6 +1,8 @@
 use gdf_testing;
+use std::error::Error;
 
-fn main() {
+#[allow(unused_must_use)]
+fn main() -> Result<(), Box<dyn Error>> {
     println!("parsing yaml");
 
     let yaml =
@@ -21,7 +23,7 @@ fn main() {
             - userSays: 'wtf'
               botRespondsWith: 'Fallback'
     ";     
-
-
-    gdf_testing::parse_yaml(yaml);
+    let suite = gdf_testing::parse(yaml)?;
+    println!("got the suite {:#?}", suite);
+    Ok(())
 }
