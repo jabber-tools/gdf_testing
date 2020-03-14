@@ -19,6 +19,17 @@
             ]
         },
         {
+            "name": "Launch gdf-testing - unit tests",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/gdf_testing-7b9099a18b445881.exe",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+
+        {
             "name": "Example - dump yaml",
             "type": "cppvsdbg",
             "request": "launch",

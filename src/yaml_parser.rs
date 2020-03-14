@@ -215,16 +215,45 @@ tests:
       desc: 'Tests default fallback intent'
       assertions:
         - userSays: 'wtf'
-          botRespondsWith: ['Fallback']
+          botRespondsWith: 'Fallback'
+        - userSays: 'foo'
+          botRespondsWith: ['bar', 'foobar']
 ";            
 
-
+const YAML2: &str =
+"
+suite-spec:
+    type: 'DialogFlow'
+    cred: '/path/to/cred'
+";            
 
     #[test]
     fn test_parse () {
         let suite =  TestSuite::new(YAML1).unwrap();
         assert_eq!(suite.suite_spec.name, "Express Tracking");
         assert_eq!(suite.tests.len(), 2);
-        parse(YAML1);
+        assert_eq!(suite.tests[0].name, "Welcome intent test");
+        
+        let mut _desc = &suite.tests[1].desc;
+        assert_eq!(_desc.as_ref().unwrap(), "Tests default fallback intent");
+
+        _desc = &suite.tests[0].desc;
+        assert_eq!(_desc.as_ref().unwrap(), "Tests default welcome intent");        
+
+        assert_eq!(suite.tests[1].assertions.len(), 2);
+        assert_eq!(suite.tests[1].assertions[1].user_says, "foo");
+        assert_eq!(suite.tests[1].assertions[1].bot_responds_with, ["bar", "foobar"]);
+        assert_eq!(suite.tests[1].assertions[0].bot_responds_with, ["Fallback"]);
+    }
+
+    #[test]
+    fn test_parse_failed_suite_name_not_found () {
+        let result =  TestSuite::new(YAML2);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Suite name not specified".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
     }
 }
