@@ -87,7 +87,7 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
-    pub fn new(yaml: &str) -> Result<TestSuite, YamlParsingError> {
+    pub fn from_yaml_str(yaml: &str) -> Result<TestSuite, YamlParsingError> {
         let docs = YamlLoader::load_from_str(yaml)?;
         let yaml: &Yaml = &docs[0];
 
@@ -115,7 +115,6 @@ impl TestSuite {
         }
 
         let tests = tests.unwrap();
-        println!("number of tests {}", tests.len());
 
         if tests.len() == 0 {
             return Err(YamlParsingError(format!("No tests specified")));
@@ -126,34 +125,38 @@ impl TestSuite {
         for test in tests.iter() {
 
             let test_name = test["name"].as_str();
-            let _test_desc = test["desc"].as_str(); //desc is optional
+            let test_desc = test["desc"].as_str(); //desc is optional
             let test_assertions = test["assertions"].as_vec();
             if let None = test_name {return Err(YamlParsingError(format!("Test name not specified")));}
                 
             let mut test_to_push;
 
-            if let None = test_assertions {
+            if let None = test_desc {
                 test_to_push = Test::new(test_name.unwrap().to_owned(), None);
             } else {
-                test_to_push = Test::new(test_name.unwrap().to_owned(), Some(_test_desc.unwrap().to_string()));
+                test_to_push = Test::new(test_name.unwrap().to_owned(), Some(test_desc.unwrap().to_string()));
             }
-                
 
+            // cannot just shaddow the variable in else section (i.e. test_assertions_vec = test_assertions.unwrap())
+            // since compiler will benot able to infer the type properly. instead we must explicitly cast test_assertions_vec
+            let mut test_assertions_vec: &Vec<Yaml> = &vec![];
             let mut assertions_found = true;
-            if let None = test_assertions { assertions_found = false; }
-            let test_assertions = test_assertions.unwrap();
-            if test_assertions.len() == 0 { 
+            if let None = test_assertions { 
                 assertions_found = false; 
+            } else {
+                test_assertions_vec = test_assertions.unwrap();
+                if test_assertions_vec.len() == 0 { 
+                    assertions_found = false; 
+                }
             }
-
+            
             if assertions_found == false {
                 return Err(YamlParsingError(format!("Test assertions not specified for {}", test_name.unwrap())));
             }
-
-                
+            
             let mut test_assertions_to_push: Vec<TestAssertion> = vec![];
 
-            for test_assertion in test_assertions.iter() {
+            for test_assertion in test_assertions_vec.iter() {
                 let user_says = test_assertion["userSays"].as_str();
                 if let None = user_says {
                     return Err(YamlParsingError(format!("Test assertions missing userSays for {}", test_name.unwrap())));
@@ -169,11 +172,19 @@ impl TestSuite {
                         let bot_responds_with = bot_responds_with.unwrap();
 
                         for bot_responds_with_str in bot_responds_with.iter() {
-                            bot_responses.push(bot_responds_with_str.as_str().unwrap().to_string());                        
+                            let bot_responds_with_str = bot_responds_with_str.as_str().unwrap();
+                            if bot_responds_with_str.trim()  == "" {
+                                return Err(YamlParsingError(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
+                            }
+                            bot_responses.push(bot_responds_with_str.to_string());                        
                         }
                     }
                 } else {
-                    bot_responses.push(bot_responds_with.unwrap().to_string());                        
+                    let _bot_responds_with = bot_responds_with.unwrap();
+                    if _bot_responds_with.trim()  == "" {
+                        return Err(YamlParsingError(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
+                    }
+                    bot_responses.push(_bot_responds_with.to_string());                        
                 }
                 test_assertions_to_push.push(TestAssertion::new(user_says.to_string(), bot_responses));
 
@@ -192,7 +203,7 @@ impl TestSuite {
 }
 
 pub fn parse (yaml: &str) -> Result<TestSuite, YamlParsingError> {
-    TestSuite::new(yaml)
+    TestSuite::from_yaml_str(yaml)
 }
 
 #[cfg(test)]
@@ -220,16 +231,9 @@ tests:
           botRespondsWith: ['bar', 'foobar']
 ";            
 
-const YAML2: &str =
-"
-suite-spec:
-    type: 'DialogFlow'
-    cred: '/path/to/cred'
-";            
-
     #[test]
     fn test_parse () {
-        let suite =  TestSuite::new(YAML1).unwrap();
+        let suite =  TestSuite::from_yaml_str(YAML1).unwrap();
         assert_eq!(suite.suite_spec.name, "Express Tracking");
         assert_eq!(suite.tests.len(), 2);
         assert_eq!(suite.tests[0].name, "Welcome intent test");
@@ -248,7 +252,15 @@ suite-spec:
 
     #[test]
     fn test_parse_failed_suite_name_not_found () {
-        let result =  TestSuite::new(YAML2);
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Suite name not specified".to_string());
@@ -256,4 +268,360 @@ suite-spec:
             _ => {panic!("error was supposed to be thrown!")}
         }
     }
+
+    #[test]
+    fn test_parse_failed_unknown_suite_type () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "SomeNonsense"
+            cred: "/path/to/cred"
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Unknown suite type found: SomeNonsense".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }    
+
+    #[test]
+    fn test_parse_failed_suite_type_not_specified () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            cred: "/path/to/cred"
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Suite type not specified".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }    
+
+    #[test]
+    fn test_parse_failed_credentials_not_specified () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Suite credentials not specified".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }        
+
+    #[test]
+    fn test_parse_no_tests_1 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "No tests specified".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }      
+
+    #[test]
+    fn test_parse_no_tests_2 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "No tests specified".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }          
+
+    #[test]
+    fn test_parse_name_not_specified () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - desc: 'Tests default welcome intent'
+              assertions:
+                - userSays: 'Hello'
+                  botRespondsWith: ['Welcome']
+            - name: 'Default fallback intent'
+              desc: 'Tests default fallback intent'
+              assertions:
+                - userSays: 'wtf'
+                  botRespondsWith: 'Fallback'
+                - userSays: 'foo'
+                  botRespondsWith: ['bar', 'foobar']
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test name not specified".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }    
+    
+    #[test]
+    fn test_parse_assertions_not_specified_1 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - name: "Welcome intent test"
+              desc: "Tests default welcome intent"
+            - name: "Default fallback intent"
+              desc: "Tests default fallback intent"
+              assertions:
+                - userSays: "wtf"
+                  botRespondsWith: "Fallback"
+                - userSays: "foo"
+                  botRespondsWith: ["bar", "foobar"]
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }    
+    
+    #[test]
+    fn test_parse_assertions_not_specified_2 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - name: "Welcome intent test"
+              desc: "Tests default welcome intent"
+              assertions:
+            - name: "Default fallback intent"
+              desc: "Tests default fallback intent"
+              assertions:
+                - userSays: "wtf"
+                  botRespondsWith: "Fallback"
+                - userSays: "foo"
+                  botRespondsWith: ["bar", "foobar"]
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }       
+
+    #[test]
+    fn test_parse_assertions_missing_user_says () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - name: "Welcome intent test"
+              desc: "Tests default welcome intent"
+              assertions:
+                - userSays: 'Hello'
+                  botRespondsWith: ['Welcome']
+            - name: "Default fallback intent"
+              desc: "Tests default fallback intent"
+              assertions:
+                - userSays123: "wtf"
+                  botRespondsWith: "Fallback"
+                - userSays: "foo"
+                  botRespondsWith: ["bar", "foobar"]
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test assertions missing userSays for Default fallback intent".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }       
+
+    #[test]
+    fn test_parse_assertions_missing_bot_responds_with_1 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - name: "Welcome intent test"
+              desc: "Tests default welcome intent"
+              assertions:
+                - userSays: 'Hello'
+            - name: "Default fallback intent"
+              desc: "Tests default fallback intent"
+              assertions:
+                - userSays: "wtf"
+                  botRespondsWith: "Fallback"
+                - userSays: "foo"
+                  botRespondsWith: ["bar", "foobar"]
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }         
+
+    #[test]
+    fn test_parse_assertions_missing_bot_responds_with_2 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - name: "Welcome intent test"
+              desc: "Tests default welcome intent"
+              assertions:
+                - userSays: 'Hello'
+                  botRespondsWith:
+            - name: "Default fallback intent"
+              desc: "Tests default fallback intent"
+              assertions:
+                - userSays: "wtf"
+                  botRespondsWith: "Fallback"
+                - userSays: "foo"
+                  botRespondsWith: ["bar", "foobar"]
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }          
+
+    #[test]
+    fn test_parse_assertions_missing_bot_responds_with_3 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - name: "Welcome intent test"
+              desc: "Tests default welcome intent"
+              assertions:
+                - userSays: 'Hello'
+                  botRespondsWith: ''
+            - name: "Default fallback intent"
+              desc: "Tests default fallback intent"
+              assertions:
+                - userSays: "wtf"
+                  botRespondsWith: "Fallback"
+                - userSays: "foo"
+                  botRespondsWith: ["bar", "foobar"]
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }        
+
+    #[test]
+    fn test_parse_assertions_missing_bot_responds_with_4 () {
+
+        const YAML: &str =
+        r#"
+        suite-spec:
+            name: "Express Tracking"
+            type: "DialogFlow"
+            cred: "/path/to/cred"
+        tests:
+            - name: "Welcome intent test"
+              desc: "Tests default welcome intent"
+              assertions:
+                - userSays: 'Hello'
+                  botRespondsWith: ['']
+            - name: "Default fallback intent"
+              desc: "Tests default fallback intent"
+              assertions:
+                - userSays: "wtf"
+                  botRespondsWith: "Fallback"
+                - userSays: "foo"
+                  botRespondsWith: ["bar", "foobar"]
+        "#;                    
+
+        let result =  TestSuite::from_yaml_str(YAML);
+        match result {
+            Err(e) => {
+                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_string());
+            },
+            _ => {panic!("error was supposed to be thrown!")}
+        }
+    }         
 }
