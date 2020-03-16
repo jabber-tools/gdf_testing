@@ -11,3 +11,4 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 yaml-rust = "0.4"
+serde_json = "1.0"
