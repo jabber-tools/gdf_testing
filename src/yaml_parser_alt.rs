@@ -62,12 +62,12 @@ impl TestAssertion {
 #[derive(Debug)]
 pub struct Test<'a> {
     pub name: &'a str,
-    pub desc: Option<String>,
+    pub desc: Option<&'a str>,
     pub assertions: Vec<TestAssertion>
 }
     
 impl<'a> Test<'a> {
-    pub fn new(name: &'a str, desc: Option<String>) -> Test<'a> {
+    pub fn new(name: &'a str, desc: Option<&'a str>) -> Test<'a> {
         Test {
             name: name,
             desc: desc,
@@ -140,7 +140,7 @@ impl<'a> TestSuite<'a> {
             if let None = test_desc {
                 test_to_push = Test::new(test_name.unwrap(), None);
             } else {
-                test_to_push = Test::new(test_name.unwrap(), Some(test_desc.unwrap().to_owned()));
+                test_to_push = Test::new(test_name.unwrap(), Some(test_desc.unwrap()));
             }
 
             // cannot just shaddow the variable in else section (i.e. test_assertions_vec = test_assertions.unwrap())
