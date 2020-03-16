@@ -60,14 +60,14 @@ impl TestAssertion {
 }
 
 #[derive(Debug)]
-pub struct Test {
-    pub name: String,
+pub struct Test<'a> {
+    pub name: &'a str,
     pub desc: Option<String>,
     pub assertions: Vec<TestAssertion>
 }
     
-impl Test {
-    pub fn new(name: String, desc: Option<String>) -> Self {
+impl<'a> Test<'a> {
+    pub fn new(name: &'a str, desc: Option<String>) -> Test<'a> {
         Test {
             name: name,
             desc: desc,
@@ -83,12 +83,12 @@ impl Test {
 #[derive(Debug)]
 pub struct TestSuite<'a> {
     pub suite_spec: TestSuiteSpec<'a>,
-    pub tests: Vec<Test>
+    pub tests: Vec<Test<'a>>
 }
 
 impl<'a> TestSuite<'a> {
 
-    pub fn new(suite_spec: TestSuiteSpec<'a>, tests: Vec<Test>) -> Self {
+    pub fn new(suite_spec: TestSuiteSpec<'a>, tests: Vec<Test<'a>>) -> TestSuite<'a> {
         TestSuite {
             suite_spec,
             tests
@@ -138,9 +138,9 @@ impl<'a> TestSuite<'a> {
             let mut test_to_push;
 
             if let None = test_desc {
-                test_to_push = Test::new(test_name.unwrap().to_owned(), None);
+                test_to_push = Test::new(test_name.unwrap(), None);
             } else {
-                test_to_push = Test::new(test_name.unwrap().to_owned(), Some(test_desc.unwrap().to_owned()));
+                test_to_push = Test::new(test_name.unwrap(), Some(test_desc.unwrap().to_owned()));
             }
 
             // cannot just shaddow the variable in else section (i.e. test_assertions_vec = test_assertions.unwrap())
@@ -221,7 +221,7 @@ mod tests {
         let assertion1 = TestAssertion::new("Hi".to_owned(), vec!["Welcome".to_owned(),"Welcome2".to_owned()]);
         let assertion2 = TestAssertion::new("whats up?".to_owned(), vec!["Smalltalk|Whats up".to_owned()]);
         
-        let mut test1 = Test::new("Test1".to_owned(), None);
+        let mut test1 = Test::new("Test1", None);
         test1.set_assertions(vec![assertion1, assertion2]);
         
         let suite_spec = TestSuiteSpec::new("Express Tracking", TestSuiteType::DialogFlow, "/path/to/cred");
