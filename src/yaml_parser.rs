@@ -1,3 +1,9 @@
+#![allow(dead_code)]
+//
+// This module is DEPRECATED, use yaml_parser_ref instead which is more memory efficient!
+// keeping it here just for demonstration and learning purpouses 
+// (comparison of strictly reference based approach versus explicit heap allocation and copying of referenced values from YAML document)
+//
 use yaml_rust::YamlLoader;
 use yaml_rust::Yaml;
 use std::fmt;
