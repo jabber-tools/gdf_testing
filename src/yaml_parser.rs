@@ -87,6 +87,14 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
+
+    pub fn new(suite_spec: TestSuiteSpec, tests: Vec<Test>) -> Self {
+        TestSuite {
+            suite_spec,
+            tests
+        }
+    }
+
     pub fn from_yaml_str(yaml: &str) -> Result<TestSuite, YamlParsingError> {
         let docs = YamlLoader::load_from_str(yaml)?;
         let yaml: &Yaml = &docs[0];
@@ -210,30 +218,54 @@ pub fn parse (yaml: &str) -> Result<TestSuite, YamlParsingError> {
 mod tests {
     use super::*;
 
-const YAML1: &str =
-"
-suite-spec:
-    name: 'Express Tracking'
-    type: 'DialogFlow'
-    cred: '/path/to/cred'
-tests:
-    - name: 'Welcome intent test'
-      desc: 'Tests default welcome intent'
-      assertions:
-        - userSays: 'Hello'
-          botRespondsWith: ['Welcome']
-    - name: 'Default fallback intent'
-      desc: 'Tests default fallback intent'
-      assertions:
-        - userSays: 'wtf'
-          botRespondsWith: 'Fallback'
-        - userSays: 'foo'
-          botRespondsWith: ['bar', 'foobar']
-";            
+    #[test]
+    fn compose_test_suite () {
+        let assertion1 = TestAssertion::new("Hi".to_string(), vec!["Welcome".to_string(),"Welcome2".to_string()]);
+        let assertion2 = TestAssertion::new("whats up?".to_string(), vec!["Smalltalk|Whats up".to_string()]);
+        
+        let mut test1 = Test::new("Test1".to_string(), None);
+        test1.set_assertions(vec![assertion1, assertion2]);
+        
+        let suite_spec = TestSuiteSpec::new("Express Tracking".to_string(), TestSuiteType::DialogFlow, "/path/to/cred".to_string());
+
+        let suite = TestSuite::new(suite_spec, vec![test1]);
+
+        assert_eq!(suite.suite_spec.name, "Express Tracking");
+        assert_eq!(suite.tests.len(), 1);
+        assert_eq!(suite.tests[0].name, "Test1");
+        
+        assert_eq!(suite.tests[0].assertions.len(), 2);
+        assert_eq!(suite.tests[0].assertions[1].user_says, "whats up?");
+        assert_eq!(suite.tests[0].assertions[1].bot_responds_with, ["Smalltalk|Whats up"]);
+        assert_eq!(suite.tests[0].assertions[0].bot_responds_with, ["Welcome", "Welcome2"]);        
+
+    }
 
     #[test]
-    fn test_parse () {
-        let suite =  TestSuite::from_yaml_str(YAML1).unwrap();
+    fn test_from_yaml_str () {
+
+        const YAML: &str =
+        "
+        suite-spec:
+            name: 'Express Tracking'
+            type: 'DialogFlow'
+            cred: '/path/to/cred'
+        tests:
+            - name: 'Welcome intent test'
+              desc: 'Tests default welcome intent'
+              assertions:
+                - userSays: 'Hello'
+                  botRespondsWith: ['Welcome']
+            - name: 'Default fallback intent'
+              desc: 'Tests default fallback intent'
+              assertions:
+                - userSays: 'wtf'
+                  botRespondsWith: 'Fallback'
+                - userSays: 'foo'
+                  botRespondsWith: ['bar', 'foobar']
+        ";           
+
+        let suite =  TestSuite::from_yaml_str(YAML).unwrap();
         assert_eq!(suite.suite_spec.name, "Express Tracking");
         assert_eq!(suite.tests.len(), 2);
         assert_eq!(suite.tests[0].name, "Welcome intent test");
@@ -623,5 +655,5 @@ tests:
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
-    }         
+    }   
 }
