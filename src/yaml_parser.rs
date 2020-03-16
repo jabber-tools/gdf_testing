@@ -142,7 +142,7 @@ impl TestSuite {
             if let None = test_desc {
                 test_to_push = Test::new(test_name.unwrap().to_owned(), None);
             } else {
-                test_to_push = Test::new(test_name.unwrap().to_owned(), Some(test_desc.unwrap().to_string()));
+                test_to_push = Test::new(test_name.unwrap().to_owned(), Some(test_desc.unwrap().to_owned()));
             }
 
             // cannot just shaddow the variable in else section (i.e. test_assertions_vec = test_assertions.unwrap())
@@ -184,7 +184,7 @@ impl TestSuite {
                             if bot_responds_with_str.trim()  == "" {
                                 return Err(YamlParsingError(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
                             }
-                            bot_responses.push(bot_responds_with_str.to_string());                        
+                            bot_responses.push(bot_responds_with_str.to_owned());                        
                         }
                     }
                 } else {
@@ -192,9 +192,9 @@ impl TestSuite {
                     if _bot_responds_with.trim()  == "" {
                         return Err(YamlParsingError(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
                     }
-                    bot_responses.push(_bot_responds_with.to_string());                        
+                    bot_responses.push(_bot_responds_with.to_owned());                        
                 }
-                test_assertions_to_push.push(TestAssertion::new(user_says.to_string(), bot_responses));
+                test_assertions_to_push.push(TestAssertion::new(user_says.to_owned(), bot_responses));
 
                 }
                 test_to_push.set_assertions(test_assertions_to_push);
@@ -204,7 +204,7 @@ impl TestSuite {
         Ok(
             TestSuite {
                 // we can safely unwrap now, None value is not possible here
-                suite_spec: TestSuiteSpec::new(name.unwrap().to_string(), suite_type.unwrap(), cred.unwrap().to_string()),
+                suite_spec: TestSuiteSpec::new(name.unwrap().to_owned(), suite_type.unwrap(), cred.unwrap().to_owned()),
                 tests: suite_tests
         }) 
     }
@@ -220,13 +220,13 @@ mod tests {
 
     #[test]
     fn compose_test_suite () {
-        let assertion1 = TestAssertion::new("Hi".to_string(), vec!["Welcome".to_string(),"Welcome2".to_string()]);
-        let assertion2 = TestAssertion::new("whats up?".to_string(), vec!["Smalltalk|Whats up".to_string()]);
+        let assertion1 = TestAssertion::new("Hi".to_owned(), vec!["Welcome".to_owned(),"Welcome2".to_owned()]);
+        let assertion2 = TestAssertion::new("whats up?".to_owned(), vec!["Smalltalk|Whats up".to_owned()]);
         
-        let mut test1 = Test::new("Test1".to_string(), None);
+        let mut test1 = Test::new("Test1".to_owned(), None);
         test1.set_assertions(vec![assertion1, assertion2]);
         
-        let suite_spec = TestSuiteSpec::new("Express Tracking".to_string(), TestSuiteType::DialogFlow, "/path/to/cred".to_string());
+        let suite_spec = TestSuiteSpec::new("Express Tracking".to_owned(), TestSuiteType::DialogFlow, "/path/to/cred".to_owned());
 
         let suite = TestSuite::new(suite_spec, vec![test1]);
 
@@ -295,7 +295,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Suite name not specified".to_string());
+                assert_eq!(e.0, "Suite name not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -315,7 +315,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Unknown suite type found: SomeNonsense".to_string());
+                assert_eq!(e.0, "Unknown suite type found: SomeNonsense".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -334,7 +334,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Suite type not specified".to_string());
+                assert_eq!(e.0, "Suite type not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -353,7 +353,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Suite credentials not specified".to_string());
+                assert_eq!(e.0, "Suite credentials not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -373,7 +373,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "No tests specified".to_string());
+                assert_eq!(e.0, "No tests specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -394,7 +394,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "No tests specified".to_string());
+                assert_eq!(e.0, "No tests specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -426,7 +426,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test name not specified".to_string());
+                assert_eq!(e.0, "Test name not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -456,7 +456,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_string());
+                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -487,7 +487,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_string());
+                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -520,7 +520,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions missing userSays for Default fallback intent".to_string());
+                assert_eq!(e.0, "Test assertions missing userSays for Default fallback intent".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -552,7 +552,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_string());
+                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -585,7 +585,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_string());
+                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -618,7 +618,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_string());
+                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -651,7 +651,7 @@ mod tests {
         let result =  TestSuite::from_yaml_str(YAML);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_string());
+                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
