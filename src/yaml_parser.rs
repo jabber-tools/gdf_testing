@@ -15,7 +15,7 @@ pub struct YamlParsingError(String);
 
 impl fmt::Display for YamlParsingError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "An Error Occurred, Please Try Again!")
+        write!(f, "YamlParsingError occurred: {}", &self.0)
     }
 }
 
