@@ -101,7 +101,7 @@ impl TestSuite {
         }
     }
 
-    pub fn from_yaml_str(yaml: &str) -> Result<TestSuite, YamlParsingError> {
+    pub fn from_yaml(yaml: &str) -> Result<TestSuite, YamlParsingError> {
         let docs = YamlLoader::load_from_str(yaml)?;
         let yaml: &Yaml = &docs[0];
 
@@ -217,7 +217,7 @@ impl TestSuite {
 }
 
 pub fn parse (yaml: &str) -> Result<TestSuite, YamlParsingError> {
-    TestSuite::from_yaml_str(yaml)
+    TestSuite::from_yaml(yaml)
 }
 
 #[cfg(test)]
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_yaml_str () {
+    fn test_from_yaml () {
 
         const YAML: &str =
         "
@@ -271,7 +271,7 @@ mod tests {
                   botRespondsWith: ['bar', 'foobar']
         ";           
 
-        let suite =  TestSuite::from_yaml_str(YAML).unwrap();
+        let suite =  TestSuite::from_yaml(YAML).unwrap();
         assert_eq!(suite.suite_spec.name, "Express Tracking");
         assert_eq!(suite.tests.len(), 2);
         assert_eq!(suite.tests[0].name, "Welcome intent test");
@@ -298,7 +298,7 @@ mod tests {
             cred: "/path/to/cred"
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Suite name not specified".to_owned());
@@ -318,7 +318,7 @@ mod tests {
             cred: "/path/to/cred"
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Unknown suite type found: SomeNonsense".to_owned());
@@ -337,7 +337,7 @@ mod tests {
             cred: "/path/to/cred"
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Suite type not specified".to_owned());
@@ -356,7 +356,7 @@ mod tests {
             type: "DialogFlow"
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Suite credentials not specified".to_owned());
@@ -376,7 +376,7 @@ mod tests {
             cred: "/path/to/cred"
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "No tests specified".to_owned());
@@ -397,7 +397,7 @@ mod tests {
         tests:
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "No tests specified".to_owned());
@@ -429,7 +429,7 @@ mod tests {
                   botRespondsWith: ['bar', 'foobar']
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test name not specified".to_owned());
@@ -459,7 +459,7 @@ mod tests {
                   botRespondsWith: ["bar", "foobar"]
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_owned());
@@ -490,7 +490,7 @@ mod tests {
                   botRespondsWith: ["bar", "foobar"]
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_owned());
@@ -523,7 +523,7 @@ mod tests {
                   botRespondsWith: ["bar", "foobar"]
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test assertions missing userSays for Default fallback intent".to_owned());
@@ -555,7 +555,7 @@ mod tests {
                   botRespondsWith: ["bar", "foobar"]
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
@@ -588,7 +588,7 @@ mod tests {
                   botRespondsWith: ["bar", "foobar"]
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
@@ -621,7 +621,7 @@ mod tests {
                   botRespondsWith: ["bar", "foobar"]
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());
@@ -654,7 +654,7 @@ mod tests {
                   botRespondsWith: ["bar", "foobar"]
         "#;                    
 
-        let result =  TestSuite::from_yaml_str(YAML);
+        let result =  TestSuite::from_yaml(YAML);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());

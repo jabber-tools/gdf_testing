@@ -94,7 +94,7 @@ impl<'a> TestSuite<'a> {
         }
     }
 
-    pub fn from_yaml_str(yaml: &Yaml) -> Result<TestSuite, YamlParsingError> {
+    pub fn from_yaml(yaml: &Yaml) -> Result<TestSuite, YamlParsingError> {
 
         let name: Option<&str> = yaml["suite-spec"]["name"].as_str();
         if let None = name {
@@ -204,7 +204,7 @@ impl<'a> TestSuite<'a> {
 }
 
 pub fn parse (docs: &Vec<Yaml>) -> Result<TestSuite, YamlParsingError> {
-    TestSuite::from_yaml_str(&docs[0])
+    TestSuite::from_yaml(&docs[0])
 }
 
 #[cfg(test)]
@@ -262,7 +262,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let suite =  TestSuite::from_yaml_str(yaml).unwrap();
+        let suite =  TestSuite::from_yaml(yaml).unwrap();
         assert_eq!(suite.suite_spec.name, "Express Tracking");
         assert_eq!(suite.tests.len(), 2);
         assert_eq!(suite.tests[0].name, "Welcome intent test");
@@ -293,7 +293,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
         match result {
             Err(e) => {
                 assert_eq!(e.0, "Suite name not specified".to_owned());
@@ -317,7 +317,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -341,7 +341,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -365,7 +365,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -390,7 +390,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -416,7 +416,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -453,7 +453,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -488,7 +488,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -524,7 +524,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -562,7 +562,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -599,7 +599,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -637,7 +637,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -675,7 +675,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
@@ -713,7 +713,7 @@ mod tests {
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
 
-        let result =  TestSuite::from_yaml_str(yaml);
+        let result =  TestSuite::from_yaml(yaml);
 
         match result {
             Err(e) => {
