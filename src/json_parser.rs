@@ -380,6 +380,7 @@ mod tests {
 
       if let Some(_value_real) = value_real {
         assert_json_eq!(json!(_value_real), from_str(value_expected).unwrap());
+        assert_eq!(_value_real.len(), 1);
       } else {
         assert!(false, "unexpected value returned")
       }

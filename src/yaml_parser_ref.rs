@@ -50,14 +50,48 @@ impl<'a> TestSuiteSpec<'a> {
 #[derive(Debug)]
 pub struct TestAssertion<'a> {
     pub user_says: &'a str,
-    pub bot_responds_with: Vec<&'a str>
+    pub bot_responds_with: Vec<&'a str>,
+    pub response_checks: Vec<TestAssertionResponseCheck<'a>>
 }
 
 impl<'a> TestAssertion<'a> {
-    pub fn new(user_says: &'a str, bot_responds_with: Vec<&'a str>) -> TestAssertion<'a> {
+    pub fn new(user_says: &'a str, bot_responds_with: Vec<&'a str>, response_checks: Vec<TestAssertionResponseCheck<'a>>) -> TestAssertion<'a> {
         TestAssertion {
-            user_says: user_says,
-            bot_responds_with: bot_responds_with
+            user_says,
+            bot_responds_with,
+            response_checks
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TestAssertionResponseCheckOperator {
+    Equals,
+    NotEquals,
+    Includes,
+    Length
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TestAssertionResponseCheckValue<'a> {
+    StrVal(&'a str),
+    NumVal(f64),
+    BoolVal(bool),
+}
+
+#[derive(Debug)]
+pub struct TestAssertionResponseCheck<'a> {
+    pub expression: &'a str,
+    pub operator: TestAssertionResponseCheckOperator,
+    pub value: TestAssertionResponseCheckValue<'a>
+}
+
+impl<'a> TestAssertionResponseCheck<'a> {
+    pub fn new(expression: &'a str, operator: TestAssertionResponseCheckOperator, value: TestAssertionResponseCheckValue<'a>) -> Self {
+        TestAssertionResponseCheck {
+            expression,
+            operator,
+            value
         }
     }
 }
@@ -92,6 +126,52 @@ impl<'a> TestSuite<'a> {
             suite_spec,
             tests
         }
+    }
+
+    fn retrieve_response_checks (yaml: &Yaml) -> Result<Vec<TestAssertionResponseCheck>, YamlParsingError> {
+        let response_checks = &yaml["responseChecks"];
+
+        let response_checks = response_checks.as_vec();
+        if let None = response_checks {
+            return Ok(vec![])
+        }
+
+        let mut test_assertion_response_check_vec = vec![];
+
+        for response_check in response_checks.unwrap().iter() {
+            let expression = response_check["expression"].as_str();
+            let operator = response_check["operator"].as_str();
+            let value = &response_check["value"];
+
+            if let None = expression {
+                return Err(YamlParsingError(format!("expression name not specified for assertion {:?}", yaml)))
+            }
+
+            if let None = operator {
+                return Err(YamlParsingError(format!("operator name not specified for assertion {:?}", yaml)))
+            }
+            
+            let _operator =  match operator.unwrap() {
+                "equals" => TestAssertionResponseCheckOperator::Equals,
+                "!equals" => TestAssertionResponseCheckOperator::NotEquals,
+                "includes" => TestAssertionResponseCheckOperator::Includes,
+                "length" => TestAssertionResponseCheckOperator::Length,
+                _ => return Err(YamlParsingError(format!("unsupported operator value specified for assertion {:?}", yaml))) 
+            };
+
+            // see https://github.com/chyh1990/yaml-rust/blob/master/src/yaml.rs
+            let _value = match &*value {
+                Yaml::Integer(ival) => TestAssertionResponseCheckValue::NumVal(*ival as f64),
+                Yaml::Real(fval) => TestAssertionResponseCheckValue::NumVal(fval.parse::<f64>().unwrap()),
+                Yaml::String(sval) => TestAssertionResponseCheckValue::StrVal(sval),
+                Yaml::Boolean(bval) => TestAssertionResponseCheckValue::BoolVal(*bval),
+                _ => return Err(YamlParsingError(format!("unsupported value specified for assertion {:?}", yaml)))
+            };
+
+            test_assertion_response_check_vec.push(TestAssertionResponseCheck::new(expression.unwrap(), _operator, _value));
+        }
+
+        Ok(test_assertion_response_check_vec)
     }
 
     pub fn from_yaml(yaml: &Yaml) -> Result<TestSuite, YamlParsingError> {
@@ -187,7 +267,8 @@ impl<'a> TestSuite<'a> {
                     }
                     bot_responses.push(_bot_responds_with);                        
                 }
-                test_assertions_to_push.push(TestAssertion::new(user_says, bot_responses));
+                let response_checks = TestSuite::retrieve_response_checks(test_assertion)?;
+                test_assertions_to_push.push(TestAssertion::new(user_says, bot_responses, response_checks));
 
                 }
                 test_to_push.assertions.extend(test_assertions_to_push);
@@ -214,8 +295,8 @@ mod tests {
 
     #[test]
     fn compose_test_suite () {
-        let assertion1 = TestAssertion::new("Hi", vec!["Welcome","Welcome2"]);
-        let assertion2 = TestAssertion::new("whats up?", vec!["Smalltalk|Whats up"]);
+        let assertion1 = TestAssertion::new("Hi", vec!["Welcome","Welcome2"], vec![]);
+        let assertion2 = TestAssertion::new("whats up?", vec!["Smalltalk|Whats up"], vec![]);
         
         let mut test1 = Test::new("Test1", None);
         test1.assertions = vec![assertion1, assertion2];
@@ -723,4 +804,70 @@ mod tests {
         }
         Ok(())
     }   
+
+
+    #[test]
+    fn test_assertion_extension () -> Result<(), YamlParsingError> {
+
+        const YAML: &str =
+        "
+        suite-spec:
+            name: 'Express Tracking'
+            type: 'DialogFlow'
+            cred: '/path/to/cred'
+        tests:
+            - name: 'Welcome intent test'
+              desc: 'Tests default welcome intent'
+              assertions:
+                - userSays: 'Hello'
+                  botRespondsWith: ['Welcome']
+            - name: 'Default fallback intent'
+              desc: 'Tests default fallback intent'
+              assertions:
+                - userSays: 'wtf'
+                  botRespondsWith: 'Fallback'
+                - userSays: 'foo'
+                  botRespondsWith: ['bar', 'foobar']
+                  responseChecks:
+                    - expression: 'queryResult.action'
+                      operator: '!equals'
+                      value: 'action.foo'
+                    - expression: 'queryResult.outputContexts[0].name'
+                      operator: 'includes'
+                      value: 'bar_prompt'
+                    - expression: 'queryResult.outputContexts[0].lifespanCount'
+                      operator: 'equals'
+                      value: 2
+                    - expression: 'queryResult.outputContexts'
+                      operator: 'length'
+                      value: 1
+                    - expression: 'queryResult.allRequiredParamsPresent'
+                      operator: 'equals'
+                      value: false
+                - userSays: 'bar'
+                  botRespondsWith: ['foo']
+                  responseChecks:
+                    - expression: 'queryResult.action'
+                      operator: 'equals'
+                      value: 'action.foo'
+                    - expression: 'queryResult.fulfillmentText'
+                      operator: 'includes'
+                      value: 'foo bar'
+
+        "; 
+
+        let docs = YamlLoader::load_from_str(YAML)?;
+        let yaml: &Yaml = &docs[0];
+
+        let suite =  TestSuite::from_yaml(yaml).unwrap();
+        
+        assert_eq!(suite.tests[1].assertions[1].user_says, "foo");
+        assert_eq!(suite.tests[1].assertions[1].response_checks.len(), 5);
+        assert_eq!(suite.tests[1].assertions[1].response_checks[0].expression, "queryResult.action");
+        assert_eq!(suite.tests[1].assertions[1].response_checks[0].operator, TestAssertionResponseCheckOperator::NotEquals);
+        assert_eq!(suite.tests[1].assertions[1].response_checks[0].value, TestAssertionResponseCheckValue::StrVal("action.foo"));
+
+        Ok(())
+    }    
+
 }
