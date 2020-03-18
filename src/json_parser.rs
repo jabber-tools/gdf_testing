@@ -9,6 +9,36 @@ use std::collections::HashMap;
 use assert_json_diff::assert_json_eq;
 use std::rc::Rc;
 
+// JMESPath types.
+// replacement for jmespath::variable::JmespathType
+// which is private (probably bug of library implementation)
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
+pub enum JmespathType {
+    Null,
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+    Expref,
+}
+
+impl fmt::Display for JmespathType {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt,
+               "{}",
+               match *self {
+                   JmespathType::Null => "null",
+                   JmespathType::String => "string",
+                   JmespathType::Number => "number",
+                   JmespathType::Boolean => "boolean",
+                   JmespathType::Array => "array",
+                   JmespathType::Object => "object",
+                   JmespathType::Expref => "expref",
+               })
+    }
+}
+
 #[derive(Debug)]
 pub struct JsonParsingError(String);
 
@@ -30,65 +60,99 @@ impl From<String> for JsonParsingError {
   }    
 }
 
+// implemnted so that we can compare JsonParsingError
+// instances in unit tests using macro assert_eq
+impl PartialEq for JsonParsingError {
+  fn eq(&self, other: &Self) -> bool {
+      self.0 == other.0
+  }
+}
 
 impl Error for JsonParsingError {}
 
-pub fn json_extract_string_value (json: &str, value: &str) -> Result<Variable, JsonParsingError> {
-    let expr = jmespath::compile(value)?;
-    let data = jmespath::Variable::from_json(json)?;
-    let result = expr.search(data)?;
+pub struct JsonParser<'a> {
+  json: &'a str
+}
 
-    match result.as_string() {
-      Some(str_value) => return Ok(Variable::String(str_value.to_owned())),
-      None => return Ok(Variable::Null)
+impl<'a> JsonParser<'a> {
+  pub fn new(json: &'a str) -> Self {
+    JsonParser {
+      json
     }
-}
-
-pub fn json_extract_number_value (json: &str, value: &str) -> Result<Variable, JsonParsingError> {
-  let expr = jmespath::compile(value)?;
-  let data = jmespath::Variable::from_json(json)?;
-  let result = expr.search(data)?;
-
-  match result.as_number() {
-    Some(number_value) => return Ok(Variable::Number(number_value)),
-    None => return Ok(Variable::Null)
   }
-}
 
-
-pub fn json_extract_object_value (json: &str, parent: &str, key: &str) -> Result<Rc<Variable>, JsonParsingError> {
-  let expr = jmespath::compile(parent)?;
-  let data = jmespath::Variable::from_json(json)?;
-  let result = expr.search(data)?;
-
-  match result.as_object() {
-    Some(map_value) => {
-      if map_value.contains_key(key) {
-        let rc_var_ref_opt: Option<&Rc<Variable>> = map_value.get(key);
-        match rc_var_ref_opt {
-          None => return Err(JsonParsingError(format!("json_extract_object_value failed. Key {} not found in {}", key, parent))),
-          Some(rc_var_ref) => return Ok(rc_var_ref.clone()) // cannot move out Variable from Rc -> need to clone
-        }
-      }
-      return Err(JsonParsingError(format!("json_extract_object_value failed. Yaml doc does not contain {}", key)));
-    },
-    None => return Err(JsonParsingError(format!("json_extract_object_value failed. Yaml doc does not contain {}", parent)))
+  pub fn search(&self, expression: &str) -> Result<Rc<Variable>, JsonParsingError> {
+    let jmespath_expr = jmespath::compile(expression)?;
+    let data = jmespath::Variable::from_json(&self.json)?;
+    let rc_var = jmespath_expr.search(data)?;
+    Ok(rc_var)
   }
-}
 
-pub fn json_unwrap_string_value_or_panic (value: Variable) -> String {
-  if let Variable::String(str_val) = value {
-    str_val
-  } else {
-    panic!(format!("json_unwrap_string_value_or_panic failed for value {}", value ));
+  pub fn extract_as_string(variable: &'a Rc<Variable>) -> Option<&'a str> {
+    match variable.as_string() {
+      Some(str_value) => Some(str_value),
+      _ => None
+    }
   }
-}
 
-pub fn json_unwrap_number_value_or_panic (value: Variable) -> f64 {
-  if let Variable::Number(number_value) = value {
-    number_value
-  } else {
-    panic!(format!("json_unwrap_number_value_or_panic failed for value {}", value ));
+  pub fn extract_as_number(variable: &'a Rc<Variable>) -> Option<f64> {
+    match variable.as_number() {
+      Some(number_value) => Some(number_value),
+      _ => None
+    }
+  }  
+
+  pub fn extract_as_bool(variable: &'a Rc<Variable>) -> Option<bool> {
+    match variable.as_boolean() {
+      Some(bool_value) => Some(bool_value),
+      _ => None
+    }
+  }    
+
+  pub fn extract_as_array(variable: &'a Rc<Variable>) -> Option<Vec<Rc<Variable>>> {
+    match variable.as_array() {
+      Some(array_value) => Some(array_value.to_vec()),
+      _ => None
+    }
+  }      
+
+  pub fn extract_as_object(variable: &'a Rc<Variable>) -> Option<Rc<Variable>> {
+    if (variable.is_object() == true) {
+      Some(variable.clone())
+    } else {
+      None
+    }
+  }  
+  
+  pub fn get_jmespath_var_type(variable: &'a Rc<Variable>) -> Option<JmespathType> {
+    if variable.is_null() {
+      return Some(JmespathType::Null)
+    }
+  
+    if variable.is_string() {
+      return Some(JmespathType::String)
+    }
+  
+    if variable.is_number() {
+      return Some(JmespathType::Number)
+    }
+    if variable.is_boolean() {
+      return Some(JmespathType::Boolean)
+    }
+  
+    if variable.is_array() {
+      return Some(JmespathType::Array)
+    }
+  
+    if variable.is_object() {
+      return Some(JmespathType::Object)
+    }
+  
+    if variable.is_expref() {
+      return Some(JmespathType::Expref)
+    }
+    
+    None
   }
 }
 
@@ -187,90 +251,177 @@ mod tests {
       }
       "#;     
 
+      #[test]
+      fn test_json_compare() {
+        let v = json!({ "an": "object" });
+        let v2 = json!({ "an": "object" });
+        assert_json_eq!(v, v2);
+  
+        let v = json!(r#"{ "an": "object" }"#);
+        let v2 = json!(r#"{ "an": "object" }"#);
+        assert_json_eq!(v, v2);
+      }    
+  
+
     // simple string parameter extraction  
     #[test]
-    fn test_string_extraction() {
-        let result = json_extract_string_value(JSON, "queryResult.action").unwrap();
-        let value = json_unwrap_string_value_or_panic(result);
-        assert_eq!("input.welcome", value);
+    fn test_json_extract_string_value_1() {
+        let parser = JsonParser::new(JSON);
+        let search_result = parser.search("queryResult.action").unwrap();
+        let value = JsonParser::extract_as_string(&search_result);
+        assert_eq!(value, Some("input.welcome"));
     }
 
-    // string parameter extraction + partial match + accessing JSON arrays
     #[test]
-    fn test_arrays_substrings() {
-        let result = json_extract_string_value(JSON, "queryResult.fulfillmentText").unwrap();
-        let value = json_unwrap_string_value_or_panic(result);
-        assert_eq!("Hi, this is Dummy Express, your specialist in international shipping.", value);
+    fn test_json_extract_string_value_2() {
+        let parser = JsonParser::new(JSON);
 
-        let result = json_extract_string_value(JSON, "queryResult.fulfillmentMessages[0].text.text[0]").unwrap();
-        let value = json_unwrap_string_value_or_panic(result);
-        assert_eq!("Hi, this is Dummy Express, your specialist in international shipping!", value);
+        let mut search_result = parser.search("queryResult.fulfillmentText").unwrap();
+        let mut value = JsonParser::extract_as_string(&search_result);
+        assert_eq!(value, Some("Hi, this is Dummy Express, your specialist in international shipping."));
 
-        let result = json_extract_string_value(JSON, "queryResult.fulfillmentMessages[2].quickReplies.quickReplies[1]").unwrap();
-        let value = json_unwrap_string_value_or_panic(result);
-        assert_eq!("Manage delivery", value);        
-        assert!(value.contains("nage deli"));        
+
+        search_result = parser.search("queryResult.fulfillmentMessages[0].text.text[0]").unwrap();
+        value = JsonParser::extract_as_string(&search_result);
+        assert_eq!(value, Some("Hi, this is Dummy Express, your specialist in international shipping!"));
+
+        search_result = parser.search("queryResult.fulfillmentMessages[2].quickReplies.quickReplies[1]").unwrap();
+        value = JsonParser::extract_as_string(&search_result);
+        assert_eq!(value, Some("Manage delivery"));
+
+        match value {
+          Some(val) => assert!(val.contains("nage deli")),
+          _ => assert!(false, r#"value should contain "nage deli""#)
+        }
     }    
 
     #[test]
-    fn test_contexts() {
-      let result = json_extract_string_value(JSON, "queryResult.outputContexts[0].name").unwrap();
-      let value = json_unwrap_string_value_or_panic(result);
-      assert_eq!("projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt", value);
+    fn test_json_extract_string_value_3() {
+      let parser = JsonParser::new(JSON);
 
-      let result = json_extract_number_value(JSON, "queryResult.outputContexts[0].lifespanCount").unwrap();
-      let value = json_unwrap_number_value_or_panic(result);
-      assert_eq!(1, value as u32);
+      let search_result = parser.search("queryResult.outputContexts[0].name").unwrap();
+      let value = JsonParser::extract_as_string(&search_result);
+      assert_eq!(value, Some("projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt"));
     }
 
+    #[test]
+    fn test_json_extract_number_value() {
+      let parser = JsonParser::new(JSON);
+
+      let search_result = parser.search("queryResult.outputContexts[0].lifespanCount").unwrap();
+      let value = JsonParser::extract_as_number(&search_result);
+      assert_eq!(value, Some(1.0));
+    }
 
     #[test]
-    fn test_json_compare1() {
-      let v = json!({ "an": "object" });
-      let v2 = json!({ "an": "object" });
-      assert_json_eq!(v, v2);
+    fn test_json_extract_boolean_value() {
+      let parser = JsonParser::new(JSON);
 
-      let v = json!(r#"{ "an": "object" }"#);
-      let v2 = json!(r#"{ "an": "object" }"#);
-      assert_json_eq!(v, v2);
+      let search_result = parser.search("queryResult.allRequiredParamsPresent").unwrap();
+      let value = JsonParser::extract_as_bool(&search_result);
+      assert_eq!(value, Some(true));
     }    
 
     #[test]
-    fn test_json_compare2() {
-      // https://gist.github.com/nwtnni/a769fa093c4118c9716957957dcee332
-      let result = json_extract_object_value(JSON, "queryResult", "intent").unwrap();
-      let value_real = json!(result);
+    fn test_json_extract_object_value_1() {
+
+      let parser = JsonParser::new(JSON);
+
+      let search_result = parser.search("queryResult.intent").unwrap();
+      let value_real = JsonParser::extract_as_object(&search_result);
+
       let value_expected = json!({
         "name": "projects/express-cs-dummy/agent/intents/b1967059-d268-4c12-861d-9d71e710b123",
         "displayName": "Generic|BIT|0|Welcome|Gen"
       });
 
-      assert_json_eq!(value_real, value_expected);
+      if let Some(_value_real) = value_real {
+        assert_json_eq!(json!(_value_real), value_expected);
+      } else {
+        assert!(false, "unexpected value returned")
+      }
     }
 
     #[test]
-    fn test_json_compare3() {
-      let result = json_extract_object_value(JSON, "queryResult", "intent").unwrap();
-      let value_real = json!(result);
-      let value_expected_str = r#"{
+    fn test_json_extract_object_value_2() {
+
+      let parser = JsonParser::new(JSON);
+
+      let search_result = parser.search("queryResult.intent").unwrap();
+      let value_real = JsonParser::extract_as_object(&search_result);
+
+      // we can provided expectd value as string as well
+      let value_expected = r#"{
         "name": "projects/express-cs-dummy/agent/intents/b1967059-d268-4c12-861d-9d71e710b123",
         "displayName": "Generic|BIT|0|Welcome|Gen"
       }"#;
 
-      assert_json_eq!(value_real, from_str(value_expected_str).unwrap());
+      if let Some(_value_real) = value_real {
+        assert_json_eq!(json!(_value_real), from_str(value_expected).unwrap());
+      } else {
+        assert!(false, "unexpected value returned")
+      }
     }
 
+
     #[test]
-    #[ignore]
-    fn test_json_compare4() {
-      // failing now, we need to find a way how to extract whole array
-      let result = json_extract_object_value(JSON, "queryResult.outputContexts[0]", "").unwrap();
-      let value_real = json!(result);
-      let value_expected_str = r#"{
+    fn test_json_extract_array_value() {
+
+      let parser = JsonParser::new(JSON);
+
+      let search_result = parser.search("queryResult.outputContexts").unwrap();
+      let value_real = JsonParser::extract_as_array(&search_result);
+
+      let value_expected = r#"[{
         "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
         "lifespanCount": 1
-      }"#;
+      }]"#;
 
-      assert_json_eq!(value_real, from_str(value_expected_str).unwrap());
+
+      if let Some(_value_real) = value_real {
+        assert_json_eq!(json!(_value_real), from_str(value_expected).unwrap());
+      } else {
+        assert!(false, "unexpected value returned")
+      }
     }    
+
+    #[test]
+    fn test_get_jmespath_var_type() {
+
+      let mut parser = JsonParser::new(JSON);
+
+      let mut search_result = parser.search("queryResult.allRequiredParamsPresentDOESNOTEXIST").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::Null));
+
+      search_result = parser.search("queryResult.outputContexts[0].name").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::String));
+
+      search_result = parser.search("queryResult.outputContexts[0].lifespanCount").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::Number));
+
+      search_result = parser.search("queryResult.allRequiredParamsPresent").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::Boolean));
+
+      search_result = parser.search("queryResult.outputContexts").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::Array));
+
+      search_result = parser.search("queryResult.outputContexts[0]").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::Object));
+
+      search_result = parser.search("queryResult").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::Object));
+
+      search_result = parser.search("queryResult").unwrap();
+      assert_eq!(JsonParser::get_jmespath_var_type(&search_result), Some(JmespathType::Object));
+      
+      parser = JsonParser::new("");
+      let search_result = parser.search("queryResult.outputContexts[0]");
+
+      match search_result {
+        Ok(_) => assert!(false, "unexpected value returned by get_jmespath_var_type, expected error!"),
+        Err(err) => assert!(err.0.contains("error when parsing json"))
+      }      
+    }
 }
+
+
