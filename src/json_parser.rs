@@ -350,7 +350,7 @@ mod tests {
       let search_result = parser.search("queryResult.intent").unwrap();
       let value_real = JsonParser::extract_as_object(&search_result);
 
-      // we can provided expectd value as string as well
+      // we can provided expected value as string as well
       let value_expected = r#"{
         "name": "projects/express-cs-dummy/agent/intents/b1967059-d268-4c12-861d-9d71e710b123",
         "displayName": "Generic|BIT|0|Welcome|Gen"
@@ -362,6 +362,49 @@ mod tests {
         assert!(false, "unexpected value returned")
       }
     }
+
+    #[test]
+    #[ignore]
+    fn test_json_extract_object_value_and_filter() {
+      
+      let parser = JsonParser::new(JSON);
+
+      // filtering seems not to work in jmespath :(
+      // https://jmespath.org/examples.html#filters-and-multiselect-lists
+      // https://jmespath.org/proposals/improved-filters.html
+      let search_result = parser.search("queryResult.fulfillmentMessages[?platform == 'FACEBOOK']").unwrap();
+      let value_real = JsonParser::extract_as_object(&search_result);
+
+      // we can provided expectd value as string as well
+      let value_expected = r#"[
+        {
+          "text": {
+            "text": [
+              "Hi, this is Dummy Express, your specialist in international shipping!"
+            ]
+          },
+          "platform": "FACEBOOK"
+        },
+        {
+          "quickReplies": {
+            "quickReplies": [
+              "Track a package",
+              "Manage delivery",
+              "Pay duties",
+              "Commercial invoice",
+              "Get a quote"
+            ]
+          },
+          "platform": "FACEBOOK"
+        }
+      ]"#;
+
+      if let Some(_value_real) = value_real {
+        assert_json_eq!(json!(_value_real), from_str(value_expected).unwrap());
+      } else {
+        assert!(false, "unexpected value returned")
+      }
+    }    
 
 
     #[test]
