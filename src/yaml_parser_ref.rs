@@ -68,6 +68,7 @@ impl<'a> TestAssertion<'a> {
 pub enum TestAssertionResponseCheckOperator {
     Equals,
     NotEquals,
+    JsonEquals,
     Includes,
     Length
 }
@@ -128,9 +129,8 @@ impl<'a> TestSuite<'a> {
         }
     }
 
-    fn retrieve_response_checks (yaml: &Yaml) -> Result<Vec<TestAssertionResponseCheck>, YamlParsingError> {
+    fn retrieve_response_checks (yaml: &'a Yaml, test_name: &'a str, assertion_name: &'a str) -> Result<Vec<TestAssertionResponseCheck<'a>>, YamlParsingError> {
         let response_checks = &yaml["responseChecks"];
-
         let response_checks = response_checks.as_vec();
         if let None = response_checks {
             return Ok(vec![])
@@ -144,19 +144,22 @@ impl<'a> TestSuite<'a> {
             let value = &response_check["value"];
 
             if let None = expression {
-                return Err(YamlParsingError(format!("expression name not specified for assertion {:?}", yaml)))
+                return Err(YamlParsingError(format!("expression name not specified for. test '{}', assertion: '{}'", test_name, assertion_name)))
             }
 
+            let expression = expression.unwrap();
+
             if let None = operator {
-                return Err(YamlParsingError(format!("operator name not specified for assertion {:?}", yaml)))
+                return Err(YamlParsingError(format!("operator name not specified. test: '{}', assertion: '{}', expression: '{}'", test_name, assertion_name, expression)))
             }
             
             let _operator =  match operator.unwrap() {
                 "equals" => TestAssertionResponseCheckOperator::Equals,
                 "!equals" => TestAssertionResponseCheckOperator::NotEquals,
+                "jsonequals" => TestAssertionResponseCheckOperator::JsonEquals,
                 "includes" => TestAssertionResponseCheckOperator::Includes,
                 "length" => TestAssertionResponseCheckOperator::Length,
-                _ => return Err(YamlParsingError(format!("unsupported operator value specified for assertion {:?}", yaml))) 
+                _ =>  return Err(YamlParsingError(format!("unsupported operator({}). test: '{}', assertion: '{}', expression: '{}'. Supported values: equals, !equals', 'jsonequals', 'includes', 'length'", operator.unwrap(),  test_name, assertion_name, expression)))
             };
 
             // see https://github.com/chyh1990/yaml-rust/blob/master/src/yaml.rs
@@ -165,10 +168,10 @@ impl<'a> TestSuite<'a> {
                 Yaml::Real(fval) => TestAssertionResponseCheckValue::NumVal(fval.parse::<f64>().unwrap()),
                 Yaml::String(sval) => TestAssertionResponseCheckValue::StrVal(sval),
                 Yaml::Boolean(bval) => TestAssertionResponseCheckValue::BoolVal(*bval),
-                _ => return Err(YamlParsingError(format!("unsupported value specified for assertion {:?}", yaml)))
+                _ => return Err(YamlParsingError(format!("unsupported value specified. test: '{}', assertion: '{}', expression: '{}'", test_name, assertion_name, expression)))
             };
 
-            test_assertion_response_check_vec.push(TestAssertionResponseCheck::new(expression.unwrap(), _operator, _value));
+            test_assertion_response_check_vec.push(TestAssertionResponseCheck::new(expression, _operator, _value));
         }
 
         Ok(test_assertion_response_check_vec)
@@ -267,7 +270,7 @@ impl<'a> TestSuite<'a> {
                     }
                     bot_responses.push(_bot_responds_with);                        
                 }
-                let response_checks = TestSuite::retrieve_response_checks(test_assertion)?;
+                let response_checks = TestSuite::retrieve_response_checks(test_assertion, test_name.unwrap(), user_says)?;
                 test_assertions_to_push.push(TestAssertion::new(user_says, bot_responses, response_checks));
 
                 }
@@ -292,6 +295,9 @@ pub fn parse (docs: &Vec<Yaml>) -> Result<TestSuite, YamlParsingError> {
 mod tests {
     use super::*;
     use yaml_rust::YamlLoader;
+    use assert_json_diff::assert_json_eq;
+    use serde_json::{json, from_str};
+    use crate::json_parser::*;
 
     #[test]
     fn compose_test_suite () {
@@ -805,12 +811,11 @@ mod tests {
         Ok(())
     }   
 
-
     #[test]
-    fn test_assertion_extension () -> Result<(), YamlParsingError> {
+    fn test_assertion_extension_1 () -> Result<(), YamlParsingError> {
 
         const YAML: &str =
-        "
+        r#"
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
@@ -849,12 +854,18 @@ mod tests {
                   responseChecks:
                     - expression: 'queryResult.action'
                       operator: 'equals'
-                      value: 'action.foo'
+                      value: 'action.foobar'
                     - expression: 'queryResult.fulfillmentText'
                       operator: 'includes'
                       value: 'foo bar'
-
-        "; 
+                    - expression: 'queryResult.outputContexts'
+                      operator: 'jsonequals'
+                      value: |
+                        {"stuff": {
+                            "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+                            "lifespanCount": 1
+                        }}                      
+        "#; 
 
         let docs = YamlLoader::load_from_str(YAML)?;
         let yaml: &Yaml = &docs[0];
@@ -867,7 +878,168 @@ mod tests {
         assert_eq!(suite.tests[1].assertions[1].response_checks[0].operator, TestAssertionResponseCheckOperator::NotEquals);
         assert_eq!(suite.tests[1].assertions[1].response_checks[0].value, TestAssertionResponseCheckValue::StrVal("action.foo"));
 
+        // thisl will not work because of whitespaces differences, we need to compare jsons in normalized way!
+        /* assert_eq!(suite.tests[1].assertions[2].response_checks[2].value, TestAssertionResponseCheckValue::StrVal(r#"{
+            "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+            "lifespanCount": 1
+        }"#)); */
+        let value_expected: serde_json::value::Value = serde_json::from_str(r#"{
+            "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+            "lifespanCount": 1
+        }"#).unwrap();
+
+        match suite.tests[1].assertions[2].response_checks[2].value {
+            TestAssertionResponseCheckValue::StrVal(str_val) => {
+
+                let parser = JsonParser::new(str_val);
+
+                // TBD: we need to find way how search/jmespath can access whole json
+                // if not possible real implementation must wrap the content by stuff placeholder implicitly
+                // so that users don't have to do it
+                let search_result = parser.search("stuff").unwrap();
+                let value_real = JsonParser::extract_as_object(&search_result);
+                
+                if let Some(_value_real) = value_real {
+                    assert_json_eq!(serde_json::json!(*_value_real), value_expected);
+                } else {
+                    assert!(false, "None value returned by extract_as_object");
+                }
+                
+            },
+            _ => assert!(false, "string value expected in asertion response check value!")
+        }
+
         Ok(())
     }    
+
+    #[test]
+    fn test_assertion_extension_no_expression () -> Result<(), YamlParsingError> {
+
+        const YAML: &str =
+        "
+        suite-spec:
+            name: 'Express Tracking'
+            type: 'DialogFlow'
+            cred: '/path/to/cred'
+        tests:
+            - name: 'Default fallback intent'
+              desc: 'Tests default fallback intent'
+              assertions:
+                - userSays: 'foo'
+                  botRespondsWith: 'bar'
+                  responseChecks:
+                    - expressionXX: 'queryResult.action'
+                      operator: '!equals'
+                      value: 'action.foo'
+        "; 
+
+        let docs = YamlLoader::load_from_str(YAML)?;
+        let yaml: &Yaml = &docs[0];
+
+        let result =  TestSuite::from_yaml(yaml);
+        match result {
+            Err(e) => assert_eq!(e.0, "expression name not specified for. test 'Default fallback intent', assertion: 'foo'"),
+            _ => panic!("error was supposed to be thrown!")
+        }
+        Ok(())
+    }        
+
+    #[test]
+    fn test_assertion_extension_no_operator () -> Result<(), YamlParsingError> {
+
+        const YAML: &str =
+        "
+        suite-spec:
+            name: 'Express Tracking'
+            type: 'DialogFlow'
+            cred: '/path/to/cred'
+        tests:
+            - name: 'Default fallback intent'
+              desc: 'Tests default fallback intent'
+              assertions:
+                - userSays: 'foo'
+                  botRespondsWith: 'bar'
+                  responseChecks:
+                    - expression: 'queryResult.action'
+                      operatorXX: '!equals'
+                      value: 'action.foo'
+        "; 
+
+        let docs = YamlLoader::load_from_str(YAML)?;
+        let yaml: &Yaml = &docs[0];
+
+        let result =  TestSuite::from_yaml(yaml);
+        match result {
+            Err(e) => assert_eq!(e.0, "operator name not specified. test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'"),
+            _ => panic!("error was supposed to be thrown!")
+        }
+        Ok(())
+    }        
+
+    #[test]
+    fn test_assertion_extension_invalid_operator () -> Result<(), YamlParsingError> {
+
+        const YAML: &str =
+        "
+        suite-spec:
+            name: 'Express Tracking'
+            type: 'DialogFlow'
+            cred: '/path/to/cred'
+        tests:
+            - name: 'Default fallback intent'
+              desc: 'Tests default fallback intent'
+              assertions:
+                - userSays: 'foo'
+                  botRespondsWith: 'bar'
+                  responseChecks:
+                    - expression: 'queryResult.action'
+                      operator: 'not in'
+                      value: 'action.foo'
+        "; 
+
+        let docs = YamlLoader::load_from_str(YAML)?;
+        let yaml: &Yaml = &docs[0];
+
+        let result =  TestSuite::from_yaml(yaml);
+        match result {
+            Err(e) => assert_eq!(e.0, "unsupported operator(not in). test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'. Supported values: equals, !equals', 'jsonequals', 'includes', 'length'"),
+            _ => panic!("error was supposed to be thrown!")
+        }
+        Ok(())
+    }          
+
+    #[test]
+    fn test_assertion_extension_invalid_value () -> Result<(), YamlParsingError> {
+
+        const YAML: &str =
+        "
+        suite-spec:
+            name: 'Express Tracking'
+            type: 'DialogFlow'
+            cred: '/path/to/cred'
+        tests:
+            - name: 'Default fallback intent'
+              desc: 'Tests default fallback intent'
+              assertions:
+                - userSays: 'foo'
+                  botRespondsWith: 'bar'
+                  responseChecks:
+                    - expression: 'queryResult.action'
+                      operator: 'equals'
+                      value:
+                        - foo: 'bar'
+                          bar: 'foo'
+        "; 
+
+        let docs = YamlLoader::load_from_str(YAML)?;
+        let yaml: &Yaml = &docs[0];
+
+        let result =  TestSuite::from_yaml(yaml);
+        match result {
+            Err(e) => assert_eq!(e.0, "unsupported value specified. test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'"),
+            _ => panic!("error was supposed to be thrown!")
+        }
+        Ok(())
+    }        
 
 }
