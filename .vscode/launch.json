@@ -22,7 +22,7 @@
             "name": "Launch gdf-testing - unit tests",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/target/debug/gdf_testing-bf9652549c1cec1d.exe",
+            "program": "${workspaceRoot}/target/debug/gdf_testing-3775c21d04d039f0.exe",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
