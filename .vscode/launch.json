@@ -22,11 +22,15 @@
             "name": "Launch gdf-testing - unit tests",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/target/debug/gdf_testing-bc0aaed329617b6f.exe",
+            "program": "${workspaceRoot}/target/debug/gdf_testing-bf9652549c1cec1d.exe",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "externalConsole": false
+            "externalConsole": false,
+            "args": [
+                "--nocapture"
+            ]
+
         },
 
         {
