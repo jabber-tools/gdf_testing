@@ -3,6 +3,7 @@ use jsonwebtoken::{encode, Header, Algorithm, EncodingKey, DecodingKey};
 use std::time::SystemTime;
 use std::fs;
 use serde_json::from_str;
+use crate::errors::{new_error, ErrorKind, Result};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -33,61 +34,40 @@ struct GoogleApisOauthToken {
     token_type:  String
 }
 
-fn file_to_gdf_credentials(file_name: &str) -> Option<GDFCredentials> {
-    let file_str_opt = fs::read_to_string(file_name).ok();
-    match file_str_opt {
-        Some(file_str) => {
-            let cred_res = serde_json::from_str::<GDFCredentials>(&file_str);
-            if let Ok(cred) = cred_res {
-                return Some(cred);
-            } else {
-                return None;
-            }
-        },
-        _ => None
-    }    
+fn file_to_gdf_credentials(file_name: &str) -> Result<GDFCredentials> {
+    let file_str = fs::read_to_string(file_name)?;
+    let cred = serde_json::from_str::<GDFCredentials>(&file_str)?;
+    Ok(cred)
 }
 
-fn pem_file_to_str(file_name: &str) -> Option<String> {
-    let result = fs::read_to_string(file_name);
-    match result {
-        // replace \n literals (i.e. "\\n") with real end line character (i.e. "\n")!
-        Ok(file_str) => Some(file_str.replace("\\n", "\n")),
-        _ => None
-    }
+fn pem_file_to_str(file_name: &str) -> Result<String> {
+    let file_str = fs::read_to_string(file_name)?;
+    // replace \n literals (i.e. "\\n") with real end line character (i.e. "\n")!
+    Ok(file_str.replace("\\n", "\n"))
 }
 
- fn pem_to_encoding_key(file_name: &str) -> Option<EncodingKey> {
-    let file_str_opt = fs::read_to_string(file_name).ok();
-    match file_str_opt {
-        Some(file_str) => {
-            // replace \n literals (i.e. "\\n") with real end line character (i.e. "\n")!
-            let file_str = file_str.replace("\\n", "\n");
-            EncodingKey::from_rsa_pem(file_str.into_bytes().as_slice()).ok()
-        },
-        _ => None
-    }
+ fn pem_to_encoding_key(file_name: &str) -> Result<EncodingKey> {
+    let file_str = fs::read_to_string(file_name)?;
+    // replace \n literals (i.e. "\\n") with real end line character (i.e. "\n")!
+    let file_str = file_str.replace("\\n", "\n");
+    let key = EncodingKey::from_rsa_pem(file_str.into_bytes().as_slice())?;
+    Ok(key)
  } 
 
- fn str_to_encoding_key(priv_key_str: String) -> Option<EncodingKey> {
-    EncodingKey::from_rsa_pem(priv_key_str.replace("\\n", "\n").into_bytes().as_slice()).ok()
+ fn str_to_encoding_key(priv_key_str: String) -> Result<EncodingKey> {
+    let key = EncodingKey::from_rsa_pem(priv_key_str.replace("\\n", "\n").into_bytes().as_slice())?;
+    Ok(key)
  }  
 
 
- fn pem_to_decoding_key<'a>(file_bytes: &'a Vec<u8>) -> Option<DecodingKey<'a>> {
+ fn pem_to_decoding_key<'a>(file_bytes: &'a Vec<u8>) -> Result<DecodingKey<'a>> {
     // DecodingKey::from_rsa_pem(&file_bytes[..]).ok()
-    let res = DecodingKey::from_rsa_pem(&file_bytes[..]);
-    match res {
-        Ok(x) => Some(x),
-        Err(err) => {
-            println!("error is {}", err);
-            None
-        }
-    }
+    let key = DecodingKey::from_rsa_pem(&file_bytes[..])?;
+    Ok(key)
  } 
 
 // see https://github.com/Keats/jsonwebtoken
-fn new_token(client_email: &str, priv_key_file: &str) -> Option<String> {
+fn new_token(client_email: &str, priv_key_file: &str) -> Result<String> {
     let _now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
     let claims = Claims {
         iss: client_email.to_owned(),
@@ -98,16 +78,13 @@ fn new_token(client_email: &str, priv_key_file: &str) -> Option<String> {
     };
 
     // RS256 - encrypting with private key
-    let encoding_key = pem_to_encoding_key(priv_key_file);
-    if encoding_key == None {
-        return None;
-    }
+    let priv_key = pem_to_encoding_key(priv_key_file)?;
     
-    let priv_key = &encoding_key.unwrap();
-    encode(&Header::new(Algorithm::RS256), &claims, priv_key).ok()
+    let token = encode(&Header::new(Algorithm::RS256), &claims, &priv_key)?;
+    Ok(token)
 }
 
-fn new_token_from_cred(cred: &GDFCredentials) -> Option<String> {
+fn new_token_from_cred(cred: &GDFCredentials) -> Result<String> {
     let _now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
     let claims = Claims {
         iss: cred.client_email.clone(),
@@ -118,13 +95,9 @@ fn new_token_from_cred(cred: &GDFCredentials) -> Option<String> {
     };
 
     // RS256 - encrypting with private key
-    let encoding_key = str_to_encoding_key(cred.private_key.clone());
-    if encoding_key == None {
-        return None;
-    }
-    
-    let priv_key = &encoding_key.unwrap();
-    encode(&Header::new(Algorithm::RS256), &claims, priv_key).ok()
+    let priv_key = str_to_encoding_key(cred.private_key.clone())?;
+    let token = encode(&Header::new(Algorithm::RS256), &claims, &priv_key)?;
+    Ok(token)
 }
 
 
@@ -146,46 +119,41 @@ mod tests {
     // for validation you need to use certificate where issued to/issued by is equal to the value client_id from json file with credentials!
     #[test]
     #[ignore]
-    fn test_new_token() {
-        let token = new_token("df-client-admin-access@express-cs-common-dev.iam.gserviceaccount.com", "./src/testdata/privkey.pem");
-        match token {
-            // Some(_token) => assert!(false, format!("token {}", _token)),
-            Some(_token) => {
+    fn test_new_token() -> Result<()> {
+        let token = new_token("df-client-admin-access@express-cs-common-dev.iam.gserviceaccount.com", "./src/testdata/privkey.pem")?;
 
-                // using uncorrect public key should result in InvalidSignature error
-                let cert_str = pem_file_to_str("./src/testdata/pubkey.pem").unwrap();
-                let cert_str_bytes = cert_str.into_bytes();
-                let dec_key = pem_to_decoding_key(&cert_str_bytes).unwrap();
-                let decoded_token = decode::<Claims>(&_token, &dec_key, &Validation::new(Algorithm::RS256));
-                match decoded_token {
-                    Err(err) =>  {
-                        match err.kind() {
-                            ErrorKind::InvalidSignature => assert!(true),
-                            _ => assert!(false, "expected InvalidSignature error, got different error instead")
-                        }
-                    },
-                    _ => assert!(false, "expected InvalidSignature error, got result instead")
+        // using uncorrect public key should result in InvalidSignature error
+        let cert_str = pem_file_to_str("./src/testdata/pubkey.pem")?;
+        let cert_str_bytes = cert_str.into_bytes();
+        let dec_key = pem_to_decoding_key(&cert_str_bytes)?;
+        let decoded_token = decode::<Claims>(&token, &dec_key, &Validation::new(Algorithm::RS256));
+        match decoded_token {
+            Err(err) =>  {
+                match err.kind() {
+                    ErrorKind::InvalidSignature => assert!(true),
+                    _ => assert!(false, "expected InvalidSignature error, got different error instead")
                 }
-
-                // using correct public key we should be able to decode the token and examine claims values
-                let cert_str = pem_file_to_str("./src/testdata/pubkey2.pem").unwrap();
-                let cert_str_bytes = cert_str.into_bytes();
-                let dec_key = pem_to_decoding_key(&cert_str_bytes).unwrap();
-                let decoded_token = decode::<Claims>(&_token, &dec_key, &Validation::new(Algorithm::RS256)).unwrap();
-
-                let claims = decoded_token.claims;
-                assert_eq!(claims.iss, "df-client-admin-access@express-cs-common-dev.iam.gserviceaccount.com");
-                assert_eq!(claims.aud, "https://www.googleapis.com/oauth2/v4/token");
-                assert_eq!(claims.scope, "https://www.googleapis.com/auth/cloud-platform");
-                assert_eq!(claims.exp - claims.iat, 3600);
             },
-            _ => assert!(false, "no token generated!")
+            _ => assert!(false, "expected InvalidSignature error, got result instead")
         }
+
+        // using correct public key we should be able to decode the token and examine claims values
+        let cert_str = pem_file_to_str("./src/testdata/pubkey2.pem").unwrap();
+        let cert_str_bytes = cert_str.into_bytes();
+        let dec_key = pem_to_decoding_key(&cert_str_bytes).unwrap();
+        let decoded_token = decode::<Claims>(&token, &dec_key, &Validation::new(Algorithm::RS256)).unwrap();
+
+        let claims = decoded_token.claims;
+        assert_eq!(claims.iss, "df-client-admin-access@express-cs-common-dev.iam.gserviceaccount.com");
+        assert_eq!(claims.aud, "https://www.googleapis.com/oauth2/v4/token");
+        assert_eq!(claims.scope, "https://www.googleapis.com/auth/cloud-platform");
+        assert_eq!(claims.exp - claims.iat, 3600);
+        Ok(())
     }
 
     #[test]
     #[ignore]
-    fn test_http_call() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_http_call() -> Result<()> {
         // let url = "https://httpbin.org/ip";
         let url = "https://postman-echo.com/get?foo=bar";
         let resp = reqwest::blocking::get(url)?.text()?;
@@ -195,11 +163,11 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_dialogflow_call() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_dialogflow_call() -> Result<()> {
         let client = reqwest::blocking::Client::new();
 
         let cred = file_to_gdf_credentials("./src/testdata/credentials.json").unwrap();
-        let token = new_token_from_cred(&cred).unwrap();
+        let token = new_token_from_cred(&cred)?;
 
         let mut headers = HeaderMap::new();   
         let body = format!("grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={}",token);
@@ -230,6 +198,4 @@ mod tests {
         println!("{}", resp);
         Ok(())        
     }    
-
-
 }    
