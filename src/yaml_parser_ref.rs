@@ -3,26 +3,7 @@
 // clearer to read (no to_owned() calls, etc.) and more memory efficient 
 // (even though this is probably negligible for average size of yaml we will typically work with)
 use yaml_rust::Yaml;
-use std::fmt;
-use yaml_rust::scanner::ScanError;
-use std::error::Error;
-
-#[derive(Debug)]
-pub struct YamlParsingError(String);
-
-impl fmt::Display for YamlParsingError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "YamlParsingError occurred: {}", &self.0)
-    }
-}
-
-impl From<ScanError> for YamlParsingError {
-    fn from(error: ScanError) -> Self {
-        YamlParsingError(format!("error when parsing yaml: {}", error))
-    }    
-}
-
-impl Error for YamlParsingError {}
+use crate::errors::{Result, ErrorKind, new_error_from, Error};
 
 #[derive(Debug)]
 pub enum TestSuiteType {
@@ -120,6 +101,10 @@ pub struct TestSuite<'a> {
     pub tests: Vec<Test<'a>>
 }
 
+fn yaml_error(message: String) -> Error {
+    new_error_from(ErrorKind::YamlParsingError(message))
+}  
+
 impl<'a> TestSuite<'a> {
 
     pub fn new(suite_spec: TestSuiteSpec<'a>, tests: Vec<Test<'a>>) -> TestSuite<'a> {
@@ -129,7 +114,8 @@ impl<'a> TestSuite<'a> {
         }
     }
 
-    fn retrieve_response_checks (yaml: &'a Yaml, test_name: &'a str, assertion_name: &'a str) -> Result<Vec<TestAssertionResponseCheck<'a>>, YamlParsingError> {
+
+    fn retrieve_response_checks (yaml: &'a Yaml, test_name: &'a str, assertion_name: &'a str) -> Result<Vec<TestAssertionResponseCheck<'a>>> {
         let response_checks = &yaml["responseChecks"];
         let response_checks = response_checks.as_vec();
         if let None = response_checks {
@@ -144,13 +130,14 @@ impl<'a> TestSuite<'a> {
             let value = &response_check["value"];
 
             if let None = expression {
-                return Err(YamlParsingError(format!("expression name not specified for. test '{}', assertion: '{}'", test_name, assertion_name)))
+                // return Err(YamlParsingError(format!("expression name not specified for. test '{}', assertion: '{}'", test_name, assertion_name)))
+                return Err(yaml_error(format!("expression name not specified for. test '{}', assertion: '{}'", test_name, assertion_name)))
             }
 
             let expression = expression.unwrap();
 
             if let None = operator {
-                return Err(YamlParsingError(format!("operator name not specified. test: '{}', assertion: '{}', expression: '{}'", test_name, assertion_name, expression)))
+                return Err(yaml_error(format!("operator name not specified. test: '{}', assertion: '{}', expression: '{}'", test_name, assertion_name, expression)))
             }
             
             let _operator =  match operator.unwrap() {
@@ -159,7 +146,7 @@ impl<'a> TestSuite<'a> {
                 "jsonequals" => TestAssertionResponseCheckOperator::JsonEquals,
                 "includes" => TestAssertionResponseCheckOperator::Includes,
                 "length" => TestAssertionResponseCheckOperator::Length,
-                _ =>  return Err(YamlParsingError(format!("unsupported operator({}). test: '{}', assertion: '{}', expression: '{}'. Supported values: equals, !equals', 'jsonequals', 'includes', 'length'", operator.unwrap(),  test_name, assertion_name, expression)))
+                _ =>  return Err(yaml_error(format!("unsupported operator({}). test: '{}', assertion: '{}', expression: '{}'. Supported values: equals, !equals', 'jsonequals', 'includes', 'length'", operator.unwrap(),  test_name, assertion_name, expression)))
             };
 
             // see https://github.com/chyh1990/yaml-rust/blob/master/src/yaml.rs
@@ -168,7 +155,7 @@ impl<'a> TestSuite<'a> {
                 Yaml::Real(fval) => TestAssertionResponseCheckValue::NumVal(fval.parse::<f64>().unwrap()),
                 Yaml::String(sval) => TestAssertionResponseCheckValue::StrVal(sval),
                 Yaml::Boolean(bval) => TestAssertionResponseCheckValue::BoolVal(*bval),
-                _ => return Err(YamlParsingError(format!("unsupported value specified. test: '{}', assertion: '{}', expression: '{}'", test_name, assertion_name, expression)))
+                _ => return Err(yaml_error(format!("unsupported value specified. test: '{}', assertion: '{}', expression: '{}'", test_name, assertion_name, expression)))
             };
 
             test_assertion_response_check_vec.push(TestAssertionResponseCheck::new(expression, _operator, _value));
@@ -177,35 +164,35 @@ impl<'a> TestSuite<'a> {
         Ok(test_assertion_response_check_vec)
     }
 
-    pub fn from_yaml(yaml: &Yaml) -> Result<TestSuite, YamlParsingError> {
+    pub fn from_yaml(yaml: &Yaml) -> Result<TestSuite> {
 
         let name: Option<&str> = yaml["suite-spec"]["name"].as_str();
         if let None = name {
-            return Err(YamlParsingError(format!("Suite name not specified")));
+            return Err(yaml_error(format!("Suite name not specified")));
         }
 
         let suite_type: Option<&str> = yaml["suite-spec"]["type"].as_str();
         let suite_type: Option<TestSuiteType> = match suite_type {
             Some("DialogFlow") => Some(TestSuiteType::DialogFlow),
             Some("DHLVAP") => Some(TestSuiteType::DHLVAP),
-            Some(unknown) =>  return Err(YamlParsingError(format!("Unknown suite type found: {}", unknown))),
-            None => return Err(YamlParsingError(String::from("Suite type not specified")))
+            Some(unknown) =>  return Err(yaml_error(format!("Unknown suite type found: {}", unknown))),
+            None => return Err(yaml_error(String::from("Suite type not specified")))
         };
 
         let cred: Option<&str> = yaml["suite-spec"]["cred"].as_str();
         if let None = cred {
-            return Err(YamlParsingError(format!("Suite credentials not specified")));
+            return Err(yaml_error(format!("Suite credentials not specified")));
         }
             
         let tests = yaml["tests"].as_vec();
         if let None = tests {
-            return Err(YamlParsingError(format!("No tests specified")));
+            return Err(yaml_error(format!("No tests specified")));
         }
 
         let tests = tests.unwrap();
 
         if tests.len() == 0 {
-            return Err(YamlParsingError(format!("No tests specified")));
+            return Err(yaml_error(format!("No tests specified")));
         }
 
         let mut suite_tests: Vec<Test> = vec![];
@@ -215,7 +202,7 @@ impl<'a> TestSuite<'a> {
             let test_name = test["name"].as_str();
             let test_desc = test["desc"].as_str(); //desc is optional
             let test_assertions: Option<&Vec<Yaml>> = test["assertions"].as_vec();
-            if let None = test_name {return Err(YamlParsingError(format!("Test name not specified")));}
+            if let None = test_name {return Err(yaml_error(format!("Test name not specified")));}
                 
             let mut test_to_push;
 
@@ -227,10 +214,10 @@ impl<'a> TestSuite<'a> {
 
             
             if let None = test_assertions { 
-                return Err(YamlParsingError(format!("Test assertions not specified for {}", test_name.unwrap())));
+                return Err(yaml_error(format!("Test assertions not specified for {}", test_name.unwrap())));
             } else if let Some(vec_of_yaml_ref) = test_assertions {
                 if vec_of_yaml_ref.len() == 0 { 
-                    return Err(YamlParsingError(format!("Test assertions not specified for {}", test_name.unwrap())));
+                    return Err(yaml_error(format!("Test assertions not specified for {}", test_name.unwrap())));
                 }
             } else {
                 // code will never get here (Option can be either None or Some, nothing else) adding else branch just for sure and explicitness
@@ -243,7 +230,7 @@ impl<'a> TestSuite<'a> {
             for test_assertion in test_assertions.unwrap().iter() {
                 let user_says = test_assertion["userSays"].as_str();
                 if let None = user_says {
-                    return Err(YamlParsingError(format!("Test assertions missing userSays for {}", test_name.unwrap())));
+                    return Err(yaml_error(format!("Test assertions missing userSays for {}", test_name.unwrap())));
                 }
                 let user_says = user_says.unwrap();
                 let mut bot_responses = vec![];
@@ -251,14 +238,14 @@ impl<'a> TestSuite<'a> {
                 if let None = bot_responds_with {
                     let bot_responds_with = test_assertion["botRespondsWith"].as_vec();
                     if let None = bot_responds_with {
-                        return Err(YamlParsingError(format!("Test assertions missing botRespondsWith for {}", test_name.unwrap())));
+                        return Err(yaml_error(format!("Test assertions missing botRespondsWith for {}", test_name.unwrap())));
                     } else {
                         let bot_responds_with = bot_responds_with.unwrap();
 
                         for bot_responds_with_str in bot_responds_with.iter() {
                             let bot_responds_with_str = bot_responds_with_str.as_str().unwrap();
                             if bot_responds_with_str.trim()  == "" {
-                                return Err(YamlParsingError(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
+                                return Err(yaml_error(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
                             }
                             bot_responses.push(bot_responds_with_str);                        
                         }
@@ -266,7 +253,7 @@ impl<'a> TestSuite<'a> {
                 } else {
                     let _bot_responds_with = bot_responds_with.unwrap();
                     if _bot_responds_with.trim()  == "" {
-                        return Err(YamlParsingError(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
+                        return Err(yaml_error(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
                     }
                     bot_responses.push(_bot_responds_with);                        
                 }
@@ -287,7 +274,7 @@ impl<'a> TestSuite<'a> {
     }
 }
 
-pub fn parse (docs: &Vec<Yaml>) -> Result<TestSuite, YamlParsingError> {
+pub fn parse (docs: &Vec<Yaml>) -> Result<TestSuite> {
     TestSuite::from_yaml(&docs[0])
 }
 
@@ -298,6 +285,14 @@ mod tests {
     use assert_json_diff::assert_json_eq;
     use serde_json::{json, from_str};
     use crate::json_parser::*;
+
+    // convenience function for testing
+    fn unwrap_yaml_parsing_error(error: Error) -> String {
+        match *error.kind {
+            ErrorKind::YamlParsingError(error_str) => error_str,
+            _ => panic!("Expected YamlParsingError, got different error type!")
+        }
+    }    
 
     #[test]
     fn compose_test_suite () {
@@ -323,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_yaml_str () -> Result<(), YamlParsingError> {
+    fn test_from_yaml_str () -> Result<()> {
 
         const YAML: &str =
         "
@@ -368,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_failed_suite_name_not_found () -> Result<(), YamlParsingError> {
+    fn test_parse_failed_suite_name_not_found () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -383,7 +378,7 @@ mod tests {
         let result =  TestSuite::from_yaml(yaml);
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Suite name not specified".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Suite name not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -391,7 +386,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_failed_unknown_suite_type () -> Result<(), YamlParsingError> {
+    fn test_parse_failed_unknown_suite_type () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -408,7 +403,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Unknown suite type found: SomeNonsense".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Unknown suite type found: SomeNonsense".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -416,7 +411,7 @@ mod tests {
     }    
 
     #[test]
-    fn test_parse_failed_suite_type_not_specified () -> Result<(), YamlParsingError> {
+    fn test_parse_failed_suite_type_not_specified () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -432,7 +427,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Suite type not specified".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Suite type not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -440,7 +435,7 @@ mod tests {
     }    
 
     #[test]
-    fn test_parse_failed_credentials_not_specified () -> Result<(), YamlParsingError> {
+    fn test_parse_failed_credentials_not_specified () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -456,7 +451,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Suite credentials not specified".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Suite credentials not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -464,7 +459,7 @@ mod tests {
     }        
 
     #[test]
-    fn test_parse_no_tests_1 () -> Result<(), YamlParsingError> {
+    fn test_parse_no_tests_1 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -481,7 +476,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "No tests specified".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "No tests specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -489,7 +484,7 @@ mod tests {
     }      
 
     #[test]
-    fn test_parse_no_tests_2 () -> Result<(), YamlParsingError> {
+    fn test_parse_no_tests_2 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -507,7 +502,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "No tests specified".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "No tests specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -515,7 +510,7 @@ mod tests {
     }          
 
     #[test]
-    fn test_parse_name_not_specified () -> Result<(), YamlParsingError> {
+    fn test_parse_name_not_specified () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -544,7 +539,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test name not specified".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test name not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -552,7 +547,7 @@ mod tests {
     }    
     
     #[test]
-    fn test_parse_assertions_not_specified_1 () -> Result<(), YamlParsingError> {
+    fn test_parse_assertions_not_specified_1 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -579,7 +574,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test assertions not specified for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -587,7 +582,7 @@ mod tests {
     }    
     
     #[test]
-    fn test_parse_assertions_not_specified_2 () -> Result<(), YamlParsingError> {
+    fn test_parse_assertions_not_specified_2 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -615,7 +610,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions not specified for Welcome intent test".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test assertions not specified for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -623,7 +618,7 @@ mod tests {
     }       
 
     #[test]
-    fn test_parse_assertions_missing_user_says () -> Result<(), YamlParsingError> {
+    fn test_parse_assertions_missing_user_says () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -653,7 +648,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions missing userSays for Default fallback intent".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test assertions missing userSays for Default fallback intent".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -661,7 +656,7 @@ mod tests {
     }       
 
     #[test]
-    fn test_parse_assertions_missing_bot_responds_with_1 () -> Result<(), YamlParsingError> {
+    fn test_parse_assertions_missing_bot_responds_with_1 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -690,7 +685,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -698,7 +693,7 @@ mod tests {
     }         
 
     #[test]
-    fn test_parse_assertions_missing_bot_responds_with_2 () -> Result<(), YamlParsingError> {
+    fn test_parse_assertions_missing_bot_responds_with_2 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -728,7 +723,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test assertions missing botRespondsWith for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -736,7 +731,7 @@ mod tests {
     }          
 
     #[test]
-    fn test_parse_assertions_missing_bot_responds_with_3 () -> Result<(), YamlParsingError> {
+    fn test_parse_assertions_missing_bot_responds_with_3 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -766,7 +761,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -774,7 +769,7 @@ mod tests {
     }        
 
     #[test]
-    fn test_parse_assertions_missing_bot_responds_with_4 () -> Result<(), YamlParsingError> {
+    fn test_parse_assertions_missing_bot_responds_with_4 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -804,7 +799,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(e.0, "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Test assertions botRespondsWith cannot be empty for Welcome intent test".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -812,7 +807,7 @@ mod tests {
     }   
 
     #[test]
-    fn test_assertion_extension_1 () -> Result<(), YamlParsingError> {
+    fn test_assertion_extension_1 () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -913,7 +908,7 @@ mod tests {
     }    
 
     #[test]
-    fn test_assertion_extension_no_expression () -> Result<(), YamlParsingError> {
+    fn test_assertion_extension_no_expression () -> Result<()> {
 
         const YAML: &str =
         "
@@ -938,14 +933,14 @@ mod tests {
 
         let result =  TestSuite::from_yaml(yaml);
         match result {
-            Err(e) => assert_eq!(e.0, "expression name not specified for. test 'Default fallback intent', assertion: 'foo'"),
+            Err(e) => assert_eq!(unwrap_yaml_parsing_error(e), "expression name not specified for. test 'Default fallback intent', assertion: 'foo'"),
             _ => panic!("error was supposed to be thrown!")
         }
         Ok(())
     }        
 
     #[test]
-    fn test_assertion_extension_no_operator () -> Result<(), YamlParsingError> {
+    fn test_assertion_extension_no_operator () -> Result<()> {
 
         const YAML: &str =
         "
@@ -970,14 +965,14 @@ mod tests {
 
         let result =  TestSuite::from_yaml(yaml);
         match result {
-            Err(e) => assert_eq!(e.0, "operator name not specified. test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'"),
+            Err(e) => assert_eq!(unwrap_yaml_parsing_error(e), "operator name not specified. test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'"),
             _ => panic!("error was supposed to be thrown!")
         }
         Ok(())
     }        
 
     #[test]
-    fn test_assertion_extension_invalid_operator () -> Result<(), YamlParsingError> {
+    fn test_assertion_extension_invalid_operator () -> Result<()> {
 
         const YAML: &str =
         "
@@ -1002,14 +997,14 @@ mod tests {
 
         let result =  TestSuite::from_yaml(yaml);
         match result {
-            Err(e) => assert_eq!(e.0, "unsupported operator(not in). test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'. Supported values: equals, !equals', 'jsonequals', 'includes', 'length'"),
+            Err(e) => assert_eq!(unwrap_yaml_parsing_error(e), "unsupported operator(not in). test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'. Supported values: equals, !equals', 'jsonequals', 'includes', 'length'"),
             _ => panic!("error was supposed to be thrown!")
         }
         Ok(())
     }          
 
     #[test]
-    fn test_assertion_extension_invalid_value () -> Result<(), YamlParsingError> {
+    fn test_assertion_extension_invalid_value () -> Result<()> {
 
         const YAML: &str =
         "
@@ -1036,10 +1031,9 @@ mod tests {
 
         let result =  TestSuite::from_yaml(yaml);
         match result {
-            Err(e) => assert_eq!(e.0, "unsupported value specified. test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'"),
+            Err(e) => assert_eq!(unwrap_yaml_parsing_error(e), "unsupported value specified. test: 'Default fallback intent', assertion: 'foo', expression: 'queryResult.action'"),
             _ => panic!("error was supposed to be thrown!")
         }
         Ok(())
     }        
-
 }

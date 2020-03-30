@@ -5,13 +5,15 @@ use std::result;
 use serde_json;
 use reqwest;
 use jsonwebtoken;
+use yaml_rust::scanner::ScanError;
 
 #[derive(Debug)]
 pub enum ErrorKind {
     GDFTokenRetrievalError,
     GDFInvocationError,
     HttpInvocationError(reqwest::Error),
-    YamlParsingError,
+    YamlParsingError(String),
+    YamlLoadingError(ScanError),
     JsonParsingError(JmespathError),
     IOError(std::io::Error),
     JsonSerDeser(serde_json::error::Error),
@@ -25,7 +27,8 @@ impl fmt::Display for ErrorKind {
             ErrorKind::GDFTokenRetrievalError => write!(f, "GDFTokenRetrievalError"),
             ErrorKind::GDFInvocationError => write!(f, "GDFInvocationError"),
             ErrorKind::HttpInvocationError(err) => write!(f, "HttpInvocationError"),
-            ErrorKind::YamlParsingError => write!(f, "YamlParsingError"),
+            ErrorKind::YamlParsingError(err) => write!(f, "YamlParsingError"),
+            ErrorKind::YamlLoadingError(err) => write!(f, "YamlLoadingError"),
             ErrorKind::JsonParsingError(err) => write!(f, "JsonParsingError"),
             ErrorKind::IOError(err) => write!(f, "IOError"),
             ErrorKind::JsonSerDeser(err) => write!(f, "JsonSerDeser"),
@@ -77,7 +80,8 @@ impl StdError for Error {
             ErrorKind::GDFInvocationError => None,
             ErrorKind::GDFTokenRetrievalError => None,
             ErrorKind::HttpInvocationError(ref err) => Some(err),
-            ErrorKind::YamlParsingError => None,
+            ErrorKind::YamlParsingError(ref err) => None,
+            ErrorKind::YamlLoadingError(ref err) => Some(err),
             ErrorKind::JsonParsingError(ref err) => Some(err),
             ErrorKind::IOError(ref err) => Some(err),
             ErrorKind::JsonSerDeser(ref err) => Some(err),
@@ -126,6 +130,12 @@ impl From<JmespathError> for Error {
 impl From<String> for Error {
     fn from(error: String) -> Error {
         new_error_from(ErrorKind::GenericError(format!("GenericError: {}", error)))
+    }
+}
+
+impl From<yaml_rust::scanner::ScanError> for Error {
+    fn from(error: yaml_rust::scanner::ScanError) -> Error {
+        new_error_from(ErrorKind::YamlLoadingError(error))
     }
 }
 
