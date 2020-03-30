@@ -3,7 +3,7 @@ use jsonwebtoken::{encode, Header, Algorithm, EncodingKey, DecodingKey};
 use std::time::SystemTime;
 use std::fs;
 use serde_json::from_str;
-use crate::errors::{new_error, ErrorKind, Result};
+use crate::errors::{Result};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {

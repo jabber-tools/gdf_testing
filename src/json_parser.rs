@@ -8,6 +8,8 @@ use serde_json::from_str;
 use std::collections::HashMap;
 use assert_json_diff::assert_json_eq;
 use std::rc::Rc;
+use crate::errors::{Result, ErrorKind};
+type StdResult<T, E> = std::result::Result<T, E>;
 
 // JMESPath types.
 // replacement for jmespath::variable::JmespathType
@@ -24,7 +26,7 @@ pub enum JmespathType {
 }
 
 impl fmt::Display for JmespathType {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> StdResult<(), fmt::Error> {
         write!(fmt,
                "{}",
                match *self {
@@ -39,37 +41,6 @@ impl fmt::Display for JmespathType {
     }
 }
 
-#[derive(Debug)]
-pub struct JsonParsingError(String);
-
-impl fmt::Display for JsonParsingError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "JsonParsingError occurred: {}", &self.0)
-    }
-}
-
-impl From<JmespathError> for JsonParsingError {
-    fn from(error: JmespathError) -> Self {
-      JsonParsingError(format!("error when parsing json: {}", error))
-    }    
-}
-
-impl From<String> for JsonParsingError {
-  fn from(error: String) -> Self {
-    JsonParsingError(format!("error when parsing json: {}", error))
-  }    
-}
-
-// implemnted so that we can compare JsonParsingError
-// instances in unit tests using macro assert_eq
-impl PartialEq for JsonParsingError {
-  fn eq(&self, other: &Self) -> bool {
-      self.0 == other.0
-  }
-}
-
-impl Error for JsonParsingError {}
-
 pub struct JsonParser<'a> {
   json: &'a str
 }
@@ -81,7 +52,7 @@ impl<'a> JsonParser<'a> {
     }
   }
 
-  pub fn search(&self, expression: &str) -> Result<Rc<Variable>, JsonParsingError> {
+  pub fn search(&self, expression: &str) -> Result<Rc<Variable>> {
     let jmespath_expr = jmespath::compile(expression)?;
     let data = jmespath::Variable::from_json(&self.json)?;
     let rc_var = jmespath_expr.search(data)?;
@@ -463,7 +434,15 @@ mod tests {
 
       match search_result {
         Ok(_) => assert!(false, "unexpected value returned by get_jmespath_var_type, expected error!"),
-        Err(err) => assert!(err.0.contains("error when parsing json"))
+        Err(err) => {
+          match *err.kind {
+            ErrorKind::GenericError(err_msg) => {
+              println!("hey");
+              assert!(err_msg.contains("GenericError: EOF while parsing a value at line 1 column 0"), "wrong error message retrieved");
+            },
+            _ => assert!(false, "Expected generic error")
+          }
+        }
       }      
     }
 }

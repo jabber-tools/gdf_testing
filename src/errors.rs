@@ -1,4 +1,5 @@
 use std::error::Error as StdError;
+use jmespath::JmespathError;
 use std::fmt;
 use std::result;
 use serde_json;
@@ -11,10 +12,11 @@ pub enum ErrorKind {
     GDFInvocationError,
     HttpInvocationError(reqwest::Error),
     YamlParsingError,
-    JsonParsingError,
+    JsonParsingError(JmespathError),
     IOError(std::io::Error),
     JsonSerDeser(serde_json::error::Error),
-    JWTCreation(jsonwebtoken::errors::Error)
+    JWTCreation(jsonwebtoken::errors::Error),
+    GenericError(String)
 }
 
 impl fmt::Display for ErrorKind {
@@ -24,19 +26,20 @@ impl fmt::Display for ErrorKind {
             ErrorKind::GDFInvocationError => write!(f, "GDFInvocationError"),
             ErrorKind::HttpInvocationError(err) => write!(f, "HttpInvocationError"),
             ErrorKind::YamlParsingError => write!(f, "YamlParsingError"),
-            ErrorKind::JsonParsingError => write!(f, "JsonParsingError"),
+            ErrorKind::JsonParsingError(err) => write!(f, "JsonParsingError"),
             ErrorKind::IOError(err) => write!(f, "IOError"),
             ErrorKind::JsonSerDeser(err) => write!(f, "JsonSerDeser"),
             ErrorKind::JWTCreation(err) => write!(f, "JWTCreation"),
+            ErrorKind::GenericError(err) => write!(f, "GenericError666")
         }
     }
 }
 
 #[derive(Debug)]
 pub struct Error {
-    kind: Box<ErrorKind>,
-    message: String,
-    code: Option<String>
+    pub kind: Box<ErrorKind>,
+    pub message: String,
+    pub code: Option<String>
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -75,10 +78,11 @@ impl StdError for Error {
             ErrorKind::GDFTokenRetrievalError => None,
             ErrorKind::HttpInvocationError(ref err) => Some(err),
             ErrorKind::YamlParsingError => None,
-            ErrorKind::JsonParsingError => None,
+            ErrorKind::JsonParsingError(ref err) => Some(err),
             ErrorKind::IOError(ref err) => Some(err),
             ErrorKind::JsonSerDeser(ref err) => Some(err),
             ErrorKind::JWTCreation(ref err) => Some(err),
+            ErrorKind::GenericError(ref err) => None,
         }
     }
 }
@@ -110,6 +114,18 @@ impl From<reqwest::Error> for Error {
 impl From<jsonwebtoken::errors::Error> for Error {
     fn from(error: jsonwebtoken::errors::Error) -> Error {
         new_error_from(ErrorKind::JWTCreation(error))
+    }
+}
+
+impl From<JmespathError> for Error {
+    fn from(error: JmespathError) -> Error {
+        new_error_from(ErrorKind::JsonParsingError(error))
+    }
+}
+
+impl From<String> for Error {
+    fn from(error: String) -> Error {
+        new_error_from(ErrorKind::GenericError(format!("GenericError: {}", error)))
     }
 }
 
