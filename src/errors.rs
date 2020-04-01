@@ -20,7 +20,8 @@ pub enum ErrorKind {
     JsonSerDeser(serde_json::error::Error),
     JWTCreation(jsonwebtoken::errors::Error),
     GenericError(String),
-    InvalidHeaderValueError(InvalidHeaderValue)
+    InvalidHeaderValueError(InvalidHeaderValue),
+    InvalidTestAssertionEvaluation,
 }
 
 impl fmt::Display for ErrorKind {
@@ -37,6 +38,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::JWTCreation(err) => write!(f, "JWTCreation"),
             ErrorKind::GenericError(err) => write!(f, "GenericError"),
             ErrorKind::InvalidHeaderValueError(err) => write!(f, "InvalidHeaderValueError"),
+            ErrorKind::InvalidTestAssertionEvaluation => write!(f, "InvalidTestAssertionEvaluation"),
         }
     }
 }
@@ -91,6 +93,7 @@ impl StdError for Error {
             ErrorKind::JWTCreation(ref err) => Some(err),
             ErrorKind::GenericError(ref err) => None,
             ErrorKind::InvalidHeaderValueError(ref err) => Some(err),
+            ErrorKind::InvalidTestAssertionEvaluation => None,
         }
     }
 }
