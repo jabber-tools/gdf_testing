@@ -4,6 +4,7 @@ use std::time::SystemTime;
 use std::fs;
 use serde_json::from_str;
 use crate::errors::{Result};
+use reqwest::header::{HeaderMap, HeaderValue};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -15,26 +16,26 @@ struct Claims {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GDFCredentials {
-    r#type: String,
-    project_id: String,
-    private_key_id: String,
-    private_key: String,
-    client_email: String,
-    client_id: String,
-    auth_uri: String,
-    token_uri: String,
-    auth_provider_x509_cert_url: String,
-    client_x509_cert_url: String
+pub struct GDFCredentials {
+    pub r#type: String,
+    pub project_id: String,
+    pub private_key_id: String,
+    pub private_key: String,
+    pub client_email: String,
+    pub client_id: String,
+    pub auth_uri: String,
+    pub token_uri: String,
+    pub auth_provider_x509_cert_url: String,
+    pub client_x509_cert_url: String
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GoogleApisOauthToken {
-    access_token: String,
-    token_type:  String
+pub struct GoogleApisOauthToken {
+    pub access_token: String,
+    pub token_type:  String
 }
 
-fn file_to_gdf_credentials(file_name: &str) -> Result<GDFCredentials> {
+pub fn file_to_gdf_credentials(file_name: &str) -> Result<GDFCredentials> {
     let file_str = fs::read_to_string(file_name)?;
     let cred = serde_json::from_str::<GDFCredentials>(&file_str)?;
     Ok(cred)
@@ -100,6 +101,41 @@ fn new_token_from_cred(cred: &GDFCredentials) -> Result<String> {
     Ok(token)
 }
 
+pub fn get_google_api_token (gdf_credentials_file: &str, http_client: &reqwest::blocking::Client) -> Result<GoogleApisOauthToken> {
+
+    let cred = file_to_gdf_credentials(gdf_credentials_file)?;
+    let token = new_token_from_cred(&cred)?;
+
+    let mut headers = HeaderMap::new();   
+    let body = format!("grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={}", token);
+    headers.insert("Content-Type", HeaderValue::from_str(("application/x-www-form-urlencoded"))?);
+    let resp = http_client.post("https://www.googleapis.com/oauth2/v4/token").body(body).headers(headers).send()?.text()?;
+    let google_apis_token = serde_json::from_str::<GoogleApisOauthToken>(&resp)?;
+    Ok(google_apis_token)
+}
+
+pub fn call_dialogflow (payload: String, project_id: &str, conv_id: &str, http_client: &reqwest::blocking::Client, bearer: &str) -> Result<(String)> {
+    let mut headers = HeaderMap::new();
+    let bearer_str = format!("Bearer {}", bearer);
+    headers.insert("Authorization", HeaderValue::from_str((&bearer_str)).unwrap());
+    headers.insert("Content-Type", HeaderValue::from_str("application/json; charset=utf-8").unwrap());
+    
+    let gdf_url = format!("https://dialogflow.googleapis.com/v2/projects/{}/agent/sessions/{}:detectIntent", project_id, conv_id);
+    let resp = http_client.post(&gdf_url).body(payload).headers(headers).send()?.text()?;
+    Ok(resp)
+}
+
+pub fn prepare_dialogflow_request(utterance: &str) -> String {
+    format!(r#"{{
+        queryParams: {{}},
+        queryInput: {{
+          text: {{
+            text: "{gdf_utterance}",
+            languageCode: 'en'
+          }}
+        }}
+      }}"#, gdf_utterance=utterance)
+}
 
 #[cfg(test)]
 mod tests {
@@ -162,39 +198,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn test_dialogflow_call() -> Result<()> {
         let client = reqwest::blocking::Client::new();
 
-        let cred = file_to_gdf_credentials("./src/testdata/credentials.json").unwrap();
-        let token = new_token_from_cred(&cred)?;
+        let cred = file_to_gdf_credentials("./src/testdata/credentials.json")?;
+        let google_apis_token = get_google_api_token("./src/testdata/credentials.json", &client)?;
 
-        let mut headers = HeaderMap::new();   
-        let body = format!("grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={}",token);
-        headers.insert("Content-Type", HeaderValue::from_str(("application/x-www-form-urlencoded")).unwrap());
-        let resp = client.post("https://www.googleapis.com/oauth2/v4/token").body(body).headers(headers).send().unwrap().text().unwrap();
-        println!("{}", resp);
-        let google_apis_token = serde_json::from_str::<GoogleApisOauthToken>(&resp).unwrap();
-
-        let convId = "16f308bc-8006-4e35-81a6-3a12653188c1";
-        let gdfURL = format!("https://dialogflow.googleapis.com/v2/projects/{}/agent/sessions/{}:detectIntent", cred.project_id, convId);
+        let conv_id = "16f308bc-8006-4e35-81a6-3a12653188c1";
         
-        let payload = r#"{
-            queryParams: {},
-            queryInput: {
-              text: {
-                text: "Hi",
-                languageCode: 'en'
-              }
-            }
-          }"#;
+        let resp = call_dialogflow (prepare_dialogflow_request("Hi"), &cred.project_id, conv_id, &client, &google_apis_token.access_token)?;
 
-        let mut headers = HeaderMap::new();
-        let bearer_str = format!("Bearer {}", google_apis_token.access_token);
-        headers.insert("Authorization", HeaderValue::from_str((&bearer_str)).unwrap());
-        headers.insert("Content-Type", HeaderValue::from_str("application/json; charset=utf-8").unwrap());
-        
-        let resp = client.post(&gdfURL).body(payload).headers(headers).send().unwrap().text().unwrap();
         println!("{}", resp);
         Ok(())        
     }    

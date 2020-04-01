@@ -6,6 +6,7 @@ use serde_json;
 use reqwest;
 use jsonwebtoken;
 use yaml_rust::scanner::ScanError;
+use reqwest::header::InvalidHeaderValue;
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -18,7 +19,8 @@ pub enum ErrorKind {
     IOError(std::io::Error),
     JsonSerDeser(serde_json::error::Error),
     JWTCreation(jsonwebtoken::errors::Error),
-    GenericError(String)
+    GenericError(String),
+    InvalidHeaderValueError(InvalidHeaderValue)
 }
 
 impl fmt::Display for ErrorKind {
@@ -33,7 +35,8 @@ impl fmt::Display for ErrorKind {
             ErrorKind::IOError(err) => write!(f, "IOError"),
             ErrorKind::JsonSerDeser(err) => write!(f, "JsonSerDeser"),
             ErrorKind::JWTCreation(err) => write!(f, "JWTCreation"),
-            ErrorKind::GenericError(err) => write!(f, "GenericError666")
+            ErrorKind::GenericError(err) => write!(f, "GenericError"),
+            ErrorKind::InvalidHeaderValueError(err) => write!(f, "InvalidHeaderValueError"),
         }
     }
 }
@@ -87,6 +90,7 @@ impl StdError for Error {
             ErrorKind::JsonSerDeser(ref err) => Some(err),
             ErrorKind::JWTCreation(ref err) => Some(err),
             ErrorKind::GenericError(ref err) => None,
+            ErrorKind::InvalidHeaderValueError(ref err) => Some(err),
         }
     }
 }
@@ -137,6 +141,12 @@ impl From<yaml_rust::scanner::ScanError> for Error {
     fn from(error: yaml_rust::scanner::ScanError) -> Error {
         new_error_from(ErrorKind::YamlLoadingError(error))
     }
+}
+
+impl From<InvalidHeaderValue> for Error {
+    fn from(error: InvalidHeaderValue) -> Error {
+        new_error_from(ErrorKind::InvalidHeaderValueError(error))
+    }    
 }
 
 #[cfg(test)]
