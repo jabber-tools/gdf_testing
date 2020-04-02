@@ -6,7 +6,7 @@ use jmespath::Variable;
 use serde_json::json;
 use serde_json::from_str;
 use std::collections::HashMap;
-use assert_json_diff::assert_json_eq;
+use assert_json_diff::{assert_json_eq, assert_json_eq_no_panic};
 use std::rc::Rc;
 use crate::errors::{Result, ErrorKind};
 type StdResult<T, E> = std::result::Result<T, E>;
@@ -124,6 +124,26 @@ impl<'a> JsonParser<'a> {
     }
     
     None
+  }
+
+  // TODO: create unit test for this (similar to test_json_extract_object_value_1)
+  pub fn compare_object_with_str (obj: Rc<Variable>, str_val: &str) -> Result<String> {
+    let json_comparison_result = assert_json_eq_no_panic(&json!(obj), &json!(str_val));
+    
+    match json_comparison_result {
+      Ok(()) => Ok("__OK__".to_owned()),
+      Err(err_msg) => Ok(err_msg) // TBD: probably define custom error here, this is cumbersome
+    }
+  }
+
+  // TODO: create unit test for this (similar to test_json_extract_array_value)
+  pub fn compare_array_with_str (arr: Vec<Rc<Variable>>, str_val: &str) -> Result<String> {
+    let json_comparison_result = assert_json_eq_no_panic(&json!(arr), &json!(str_val));
+    
+    match json_comparison_result {
+      Ok(()) => Ok("__OK__".to_owned()),
+      Err(err_msg) => Ok(err_msg) // TBD: probably define custom error here, this is cumbersome
+    }
   }
 }
 

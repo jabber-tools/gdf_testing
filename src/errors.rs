@@ -22,6 +22,7 @@ pub enum ErrorKind {
     GenericError(String),
     InvalidHeaderValueError(InvalidHeaderValue),
     InvalidTestAssertionEvaluation,
+    InvalidTestAssertionResponseCheckEvaluation
 }
 
 impl fmt::Display for ErrorKind {
@@ -39,6 +40,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::GenericError(err) => write!(f, "GenericError"),
             ErrorKind::InvalidHeaderValueError(err) => write!(f, "InvalidHeaderValueError"),
             ErrorKind::InvalidTestAssertionEvaluation => write!(f, "InvalidTestAssertionEvaluation"),
+            ErrorKind::InvalidTestAssertionResponseCheckEvaluation => write!(f, "InvalidTestAssertionResponseCheckEvaluation"),
         }
     }
 }
@@ -94,6 +96,7 @@ impl StdError for Error {
             ErrorKind::GenericError(ref err) => None,
             ErrorKind::InvalidHeaderValueError(ref err) => Some(err),
             ErrorKind::InvalidTestAssertionEvaluation => None,
+            ErrorKind::InvalidTestAssertionResponseCheckEvaluation => None
         }
     }
 }

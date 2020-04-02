@@ -1,4 +1,4 @@
-// This module is alternative to yaml_parser. Instaed of coping data from yaml document 
+// This module is alternative to yaml_parser_old. Instaed of coping data from yaml document 
 // into heap it strictly uses references to original yaml data. This makes the implementation
 // clearer to read (no to_owned() calls, etc.) and more memory efficient 
 // (even though this is probably negligible for average size of yaml we will typically work with)
