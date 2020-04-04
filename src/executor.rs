@@ -72,7 +72,7 @@ pub fn process_assertion(context: &AssertionExecutionContext) -> Result<String> 
 
 // highly unoptimized and naive version of method for checking assertion response checks
 // we will have to do something with this terrifying code...
-pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseCheck, response: &str) -> Result<()> {
+pub fn process_assertion_response_check(response_check: &TestAssertionResponseCheck, response: &str) -> Result<()> {
     match response_check.value {
         
         TestAssertionResponseCheckValue::BoolVal(bool_val_expected) => {
@@ -82,32 +82,33 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                 TestAssertionResponseCheckOperator::Equals => {
                     let parser = JsonParser::new(response);
                     let search_result = parser.search(response_check.expression)?;
+
                     let value = JsonParser::extract_as_bool(&search_result);
                     if let Some(bool_val_real) = value {
                         if bool_val_real == bool_val_expected {
                             return Ok(());
                         } else {
-                            let error_message = format!("Expected value ({}) does not match real value: ({}) for expression {}", bool_val_expected, bool_val_real, response_check.expression);
+                            let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", bool_val_expected, bool_val_real, response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Unable to retrieve boolean value {} for expression: '{}'", bool_val_expected, response_check.expression);
+                        let error_message = format!("Unable to retrieve boolean value {} for expression: {}", bool_val_expected, response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 },
 
                 TestAssertionResponseCheckOperator::Includes => {
-                    let error_message = format!("Operator includes not allowed for boolean value of expression: '{}'", response_check.expression);
+                    let error_message = format!("Operator includes not allowed for boolean value of expression: {}", response_check.expression);
                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                 },
 
                 TestAssertionResponseCheckOperator::JsonEquals => {
-                    let error_message = format!("Operator jsonequals not allowed for boolean value of expression: '{}'", response_check.expression);
+                    let error_message = format!("Operator jsonequals not allowed for boolean value of expression: {}", response_check.expression);
                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                 },
 
                 TestAssertionResponseCheckOperator::Length => {
-                    let error_message = format!("Operator length not allowed for boolean value of expression: '{}'", response_check.expression);
+                    let error_message = format!("Operator length not allowed for boolean value of expression: {}", response_check.expression);
                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                 },
 
@@ -123,7 +124,7 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Unable to retrieve boolean value {} for expression: '{}'", !bool_val_expected, response_check.expression);
+                        let error_message = format!("Unable to retrieve boolean value {} for expression: {}", !bool_val_expected, response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 }
@@ -144,11 +145,11 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                         if str_val_real == str_val_expected {
                             return Ok(());
                         } else {
-                            let error_message = format!("Expected value '{}' does not match real value: '{}' for expression {}", str_val_expected, str_val_real, response_check.expression);
+                            let error_message = format!("Expected value '{}' does not match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Unable to retrieve string value for expression: '{}'", response_check.expression);
+                        let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 },
@@ -161,11 +162,11 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                         if str_val_real.contains(str_val_expected) == true {
                             return Ok(());
                         } else {
-                            let error_message = format!("Expected value '{}' not included in real value: '{}' for expression {}", str_val_expected, str_val_real, response_check.expression);
+                            let error_message = format!("Expected value '{}' not included in real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Unable to retrieve string value for expression: '{}'", response_check.expression);
+                        let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 },
@@ -174,26 +175,25 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                     let parser = JsonParser::new(response);
                     let search_result = parser.search(response_check.expression)?;
 
-                    // TBD... interpret real value as object or array and compare with string value of response check
                     if JsonParser::get_jmespath_var_type(&search_result) == Some(JmespathType::Array) {
                        
                         let value = JsonParser::extract_as_array(&search_result);
                         if let Some(array_val_real) = value {
-                            let json_comparison_result = JsonParser::compare_array_with_str(array_val_real, str_val_expected);
+                            let json_comparison_result = JsonParser::compare_array_with_str(&array_val_real, str_val_expected);
 
                             match json_comparison_result {
                                 Ok(str_val) if str_val == "__OK__" => {},
                                 Ok(err_msg) => {
-                                    let error_message = format!("Arrays not matching for expression '{}' Error: {}", response_check.expression, err_msg);
+                                    let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
                                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                                 },
                                 Err(error) => {
-                                    let error_message = format!("Arrays not matching for expression '{}' Error: {}", response_check.expression, error);
+                                    let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, error);
                                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                                 }
                             }
                         } else {
-                            let error_message = format!("Unable to retrieve string value for expression: '{}'", response_check.expression);
+                            let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     
@@ -201,26 +201,26 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                         let value = JsonParser::extract_as_object(&search_result);
 
                         if let Some(obj_val_real) = value {
-                            let json_comparison_result = JsonParser::compare_object_with_str(obj_val_real, str_val_expected);
+                            let json_comparison_result = JsonParser::compare_object_with_str(&obj_val_real, str_val_expected);
 
                             match json_comparison_result {
                                 Ok(str_val) if str_val == "__OK__" => {},
                                 Ok(err_msg) => {
-                                    let error_message = format!("Objects not matching for expression '{}' Error: {}", response_check.expression, err_msg);
+                                    let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
                                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                                 },
                                 Err(error) => {
-                                    let error_message = format!("Objects not matching for expression '{}' Error: {}", response_check.expression, error);
+                                    let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, error);
                                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                                 }
                             }
                         } else {
-                            let error_message = format!("Unable to retrieve string value for expression: '{}'", response_check.expression);
+                            let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                         
                     } else {
-                        let error_message = format!("Cannot apply jsonequals oeprator. Retrieved value is neither object nor array for expression: '{}'", response_check.expression);
+                        let error_message = format!("Cannot apply jsonequals operator. Retrieved value is neither object nor array for expression: {}", response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 },
@@ -235,14 +235,14 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                     let search_result = parser.search(response_check.expression)?;
                     let value = JsonParser::extract_as_string(&search_result);
                     if let Some(str_val_real) = value {
-                        if str_val_real == str_val_expected {
+                        if str_val_real != str_val_expected {
                             return Ok(());
                         } else {
-                            let error_message = format!("Expected value ({}) does match real value: ({}) for expression {}", str_val_expected, str_val_real, response_check.expression);
+                            let error_message = format!("Expected value '{}' does match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Unable to retrieve string value for expression: '{}'", response_check.expression);
+                        let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 }
@@ -263,27 +263,27 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                         if num_val_real == num_val_expected {
                             return Ok(());
                         } else {
-                            let error_message = format!("Expected value ({}) does not match real value: ({}) for expression {}", num_val_expected, num_val_real, response_check.expression);
+                            let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Unable to retrieve numerical value for expression: '{}'", response_check.expression);
+                        let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 },
 
                 TestAssertionResponseCheckOperator::Includes => {
-                    let error_message = format!("Operator includes not allowed for numeric value of expression: '{}'", response_check.expression);
+                    let error_message = format!("Operator includes not allowed for numeric value of expression: {}", response_check.expression);
                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                 },
 
                 TestAssertionResponseCheckOperator::JsonEquals => {
-                    let error_message = format!("Operator jsonequals not allowed for numeric value of expression: '{}'", response_check.expression);
+                    let error_message = format!("Operator jsonequals not allowed for numeric value of expression: {}", response_check.expression);
                     return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                 },
 
                 TestAssertionResponseCheckOperator::Length => {
-                    // TBD: we will support length of arrays only, not lenght of strings or number of digits in number
+                    // we do support length of arrays only, not lenght of strings or number of digits in number!
                     let parser = JsonParser::new(response);
                     let search_result = parser.search(response_check.expression)?;
 
@@ -293,15 +293,15 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                             if arr_value.len() == num_val_expected as usize { // TODO: num value in response check should be usize, f64 does not make sense if used only for array length comparison
                                 return Ok(());
                             } else {
-                                let error_message = format!("Expected array length {}, got {} for expression: '{}'", num_val_expected, arr_value.len(), response_check.expression);
+                                let error_message = format!("Expected array length {}, got {} for expression: {}", num_val_expected, arr_value.len(), response_check.expression);
                                 return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                             }
                         } else {
-                            let error_message = format!("Unable to retrieve array value for expression: '{}'", response_check.expression);
+                            let error_message = format!("Unable to retrieve array value for expression: {}", response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Operator length allowed for array exoressions only. Expression: '{}'", response_check.expression);
+                        let error_message = format!("Operator length allowed for array exoressions only. Expression: {}", response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 },
@@ -314,11 +314,11 @@ pub fn process_assertion_respopnse_check(response_check: &TestAssertionResponseC
                         if num_val_real != num_val_expected {
                             return Ok(());
                         } else {
-                            let error_message = format!("Expected value ({}) does equal real value: ({}) for expression {}", num_val_expected, num_val_real, response_check.expression);
+                            let error_message = format!("Expected value ({}) does equal real value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     } else {
-                        let error_message = format!("Unable to retrieve numerical value for expression: '{}'", response_check.expression);
+                        let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
                         return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     }
                 }
@@ -361,9 +361,100 @@ pub fn invoke_vap(context: &AssertionExecutionContext) -> Result<String> {
 mod tests {
     use super::*;
 
+    const JSON: &str =
+    r#"
+    {
+        "responseId": "24f4edc7-d7aa-43f6-a088-5069e9e90305-35305123",
+        "queryResult": {
+          "queryText": "hi",
+          "action": "input.welcome",
+          "parameters": {},
+          "allRequiredParamsPresent": true,
+          "fulfillmentText": "Hi, this is Dummy Express, your specialist in international shipping.",
+          "fulfillmentMessages": [
+            {
+              "text": {
+                "text": [
+                  "Hi, this is Dummy Express, your specialist in international shipping!"
+                ]
+              },
+              "platform": "FACEBOOK"
+            },
+            {
+              "text": {
+                "text": [
+                  "Hi, this is Dummy Express, your specialist in international shipping. I can track a package if you provide a 10 digit shipment number. I can also provide rate quotes."
+                ]
+              },
+              "platform": "LINE"
+            },
+            {
+              "quickReplies": {
+                "quickReplies": [
+                  "Track a package",
+                  "Manage delivery",
+                  "Pay duties",
+                  "Commercial invoice",
+                  "Get a quote"
+                ]
+              },
+              "platform": "FACEBOOK"
+            },
+            {
+              "platform": "ACTIONS_ON_GOOGLE",
+              "simpleResponses": {
+                "simpleResponses": [
+                  {
+                    "ssml": "<speak><prosody rate=\"115%\"><s>Welcome to Dummy Express, your specialist in international shipping.</s>\n<s>I can track a package or provide rate quotes.</s></prosody></speak>"
+                  }
+                ]
+              }
+            },
+            {
+              "quickReplies": {
+                "quickReplies": [
+                  "Track a package",
+                  "Manage delivery",
+                  "Pay duties",
+                  "Commercial invoice",
+                  "Get a quote"
+                ]
+              },
+              "platform": "SKYPE"
+            },
+            {
+              "text": {
+                "text": [
+                  "Hi, this is Dummy Express, your specialist in international shipping. I can track a package if you provide a 10 digit shipment number. I can also provide rate quotes."
+                ]
+              }
+            }
+          ],
+          "outputContexts": [
+            {
+              "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+              "lifespanCount": 1
+            }
+          ],
+          "intent": {
+            "name": "projects/express-cs-dummy/agent/intents/b1967059-d268-4c12-861d-9d71e710b123",
+            "displayName": "Generic|BIT|0|Welcome|Gen"
+          },
+          "intentDetectionConfidence": 1,
+          "languageCode": "en",
+          "sentimentAnalysisResult": {
+            "queryTextSentiment": {
+              "score": 0.3,
+              "magnitude": 0.3
+            }
+          }
+        }
+      }
+      "#;         
+
     // cargo test -- --show-output test_process_test
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_process_test() -> Result<()> {
         const YAML: &str =
         "
@@ -378,7 +469,7 @@ mod tests {
                 - userSays: 'Hello'
                   botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
                 - userSays: 'track a package'
-                  botRespondsWith: ['Tracking|CS|0|Prompt|Gen2']
+                  botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
         ";     
         
         let docs = YamlLoader::load_from_str(YAML)?;
@@ -397,5 +488,318 @@ mod tests {
         }
         Ok(())
     }
+
+    #[test]
+    fn test_process_assertion_response_check_str_equals() {
+        let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action", 
+            TestAssertionResponseCheckOperator::Equals,
+            TestAssertionResponseCheckValue::StrVal("input.welcome")
+        );
+
+        let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action", 
+            TestAssertionResponseCheckOperator::Equals,
+            TestAssertionResponseCheckValue::StrVal("foo.bar")
+        );
+
+        let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action.does.not.exists", 
+            TestAssertionResponseCheckOperator::Equals,
+            TestAssertionResponseCheckValue::StrVal("foo.bar")
+        );
+        
+        assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
+        
+        match process_assertion_response_check(&check_ko_1, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Expected value 'foo.bar' does not match real value: 'input.welcome' for expression: queryResult.action");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }
+
+        match process_assertion_response_check(&check_ko_2, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Unable to retrieve string value for expression: queryResult.action.does.not.exists");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }        
+    }
+
+    #[test]
+    fn test_process_assertion_response_check_str_includes() {
+        let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action", 
+            TestAssertionResponseCheckOperator::Includes,
+            TestAssertionResponseCheckValue::StrVal("nput.welcom")
+        );
+
+        let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action", 
+            TestAssertionResponseCheckOperator::Includes,
+            TestAssertionResponseCheckValue::StrVal("foo.bar")
+        );
+
+        let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action.does.not.exists", 
+            TestAssertionResponseCheckOperator::Includes,
+            TestAssertionResponseCheckValue::StrVal("foo.bar")
+        );
+        
+        assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
+        
+        match process_assertion_response_check(&check_ko_1, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Expected value 'foo.bar' not included in real value: 'input.welcome' for expression: queryResult.action");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }
+
+        match process_assertion_response_check(&check_ko_2, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Unable to retrieve string value for expression: queryResult.action.does.not.exists");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }        
+    }    
+
+    #[test]
+    fn test_process_assertion_response_check_str_not_equals() {
+        let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action", 
+            TestAssertionResponseCheckOperator::NotEquals,
+            TestAssertionResponseCheckValue::StrVal("foo.bar")
+        );
+
+        let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action", 
+            TestAssertionResponseCheckOperator::NotEquals,
+            TestAssertionResponseCheckValue::StrVal("input.welcome")
+        );
+
+        let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action.does.not.exists", 
+            TestAssertionResponseCheckOperator::NotEquals,
+            TestAssertionResponseCheckValue::StrVal("input.welcome")
+        );
+        
+        assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
+        
+        match process_assertion_response_check(&check_ko_1, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Expected value 'input.welcome' does match real value: 'input.welcome' for expression: queryResult.action");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }
+
+        match process_assertion_response_check(&check_ko_2, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Unable to retrieve string value for expression: queryResult.action.does.not.exists");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }        
+    }    
+
+    #[test]
+    fn test_process_assertion_response_check_str_length() {
+        let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.action", 
+            TestAssertionResponseCheckOperator::Length,
+            TestAssertionResponseCheckValue::StrVal("input.welcome")
+        );
+
+        match process_assertion_response_check(&check_ko_1, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Operator length not allowed for string value of expression: 'queryResult.action'. If value is '4' use 4 instead.");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }
+    }        
+
+    #[test]
+    fn test_process_assertion_response_check_str_json_equals_arrays() {
+        let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.outputContexts", 
+            TestAssertionResponseCheckOperator::JsonEquals,
+            TestAssertionResponseCheckValue::StrVal(r#"
+            [
+                {
+                  "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+                  "lifespanCount": 1
+                }
+            ]            
+            "#)
+        );
+
+        let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.outputContexts", 
+            TestAssertionResponseCheckOperator::JsonEquals,
+            TestAssertionResponseCheckValue::StrVal(r#"
+            [
+                {
+                  "name2": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+                  "lifespanCount": 2
+                }
+            ]            
+            "#)
+        );
+
+        let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.outputContexts.does.not.exists", 
+            TestAssertionResponseCheckOperator::NotEquals,
+            TestAssertionResponseCheckValue::StrVal(r#"[{"foo": "bar"}]"#)
+        );
+        
+        assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
+        
+        match process_assertion_response_check(&check_ko_1, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        println!("{}", err.message);
+                        /*    
+                        should get something like:
+
+                        Arrays not matching for expression 'queryResult.outputContexts'. Error: json atoms at path "[0].lifespanCount" are not equal:
+                        lhs:
+                            1
+                        rhs:
+                            2
+                        json atom at path "[0].name2" is missing from lhs
+                        */
+
+                        assert_eq!(err.message.contains("Arrays not matching for expression 'queryResult.outputContexts'"), true);
+                        assert_eq!(err.message.contains(r#"json atoms at path "[0].lifespanCount" are not equal"#), true);
+                        assert_eq!(err.message.contains(r#"json atom at path "[0].name2" is missing from lhs"#), true);
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }
+
+        match process_assertion_response_check(&check_ko_2, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Unable to retrieve string value for expression: queryResult.outputContexts.does.not.exists");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }        
+    }    
+
+    #[test]
+    fn test_process_assertion_response_check_str_json_equals_objects() {
+        let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.outputContexts[0]", 
+            TestAssertionResponseCheckOperator::JsonEquals,
+            TestAssertionResponseCheckValue::StrVal(r#"
+                {
+                  "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+                  "lifespanCount": 1
+                }
+            "#)
+        );
+
+        let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.outputContexts[0]", 
+            TestAssertionResponseCheckOperator::JsonEquals,
+            TestAssertionResponseCheckValue::StrVal(r#"
+                {
+                  "name2": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+                  "lifespanCount": 2
+                }
+            "#)
+        );
+
+        let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.outputContexts.does.not.exists", 
+            TestAssertionResponseCheckOperator::NotEquals,
+            TestAssertionResponseCheckValue::StrVal(r#"{"foo": "bar"}"#)
+        );
+        
+        assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
+        
+        match process_assertion_response_check(&check_ko_1, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        println!("{}", err.message);
+                        /*    
+                        should get something like:
+
+                        Objects not matching for expression 'queryResult.outputContexts[0]'. Error: json atoms at path ".lifespanCount" are not equal:
+                            lhs:
+                                1
+                            rhs:
+                                2
+
+                        json atom at path ".name" is missing from rhs
+
+                        json atom at path ".name2" is missing from lhs
+                        */
+
+                        assert_eq!(err.message.contains("Objects not matching for expression 'queryResult.outputContexts[0]'"), true);
+                        assert_eq!(err.message.contains(r#"json atoms at path ".lifespanCount" are not equal:"#), true);
+                        assert_eq!(err.message.contains(r#"json atom at path ".name" is missing from rhs"#), true);
+                        assert_eq!(err.message.contains(r#"json atom at path ".name2" is missing from lhs"#), true);
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }
+
+        match process_assertion_response_check(&check_ko_2, JSON) {
+            Err(err) => {
+                match *err.kind {
+                    ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                        assert_eq!(err.message, "Unable to retrieve string value for expression: queryResult.outputContexts.does.not.exists");
+                    },
+                    _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error, got different error")
+                }
+            },
+            _ => assert!(false, "Expected InvalidTestAssertionResponseCheckEvaluation error")
+        }        
+    }    
+
 }
     

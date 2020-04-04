@@ -126,9 +126,8 @@ impl<'a> JsonParser<'a> {
     None
   }
 
-  // TODO: create unit test for this (similar to test_json_extract_object_value_1)
-  pub fn compare_object_with_str (obj: Rc<Variable>, str_val: &str) -> Result<String> {
-    let json_comparison_result = assert_json_eq_no_panic(&json!(obj), &json!(str_val));
+  pub fn compare_object_with_str (obj: &Rc<Variable>, str_val: &str) -> Result<String> {
+    let json_comparison_result = assert_json_eq_no_panic(&json!(obj), &from_str(str_val)?);
     
     match json_comparison_result {
       Ok(()) => Ok("__OK__".to_owned()),
@@ -136,9 +135,8 @@ impl<'a> JsonParser<'a> {
     }
   }
 
-  // TODO: create unit test for this (similar to test_json_extract_array_value)
-  pub fn compare_array_with_str (arr: Vec<Rc<Variable>>, str_val: &str) -> Result<String> {
-    let json_comparison_result = assert_json_eq_no_panic(&json!(arr), &json!(str_val));
+  pub fn compare_array_with_str (arr: &Vec<Rc<Variable>>, str_val: &str) -> Result<String> {
+    let json_comparison_result = assert_json_eq_no_panic(&json!(arr), &from_str(str_val)?);
     
     match json_comparison_result {
       Ok(()) => Ok("__OK__".to_owned()),
@@ -354,6 +352,28 @@ mod tests {
       }
     }
 
+    // similar to previous test but uses internally (inside compare_object_with_str) assert_json_eq_no_panic
+    #[test]
+    fn test_compare_object_with_str () {
+      let parser = JsonParser::new(JSON);
+
+      let search_result = parser.search("queryResult.intent").unwrap();
+      let value_real = JsonParser::extract_as_object(&search_result);
+
+      let value_expected = r#"{
+        "name": "projects/express-cs-dummy/agent/intents/b1967059-d268-4c12-861d-9d71e710b123",
+        "displayName": "Generic|BIT|0|Welcome|Gen"
+      }"#;
+
+      if let Some(_value_real) = value_real {
+        let result = JsonParser::compare_object_with_str(&_value_real, value_expected).unwrap();
+        assert_eq!(result, "__OK__");
+        assert_json_eq!(json!(_value_real), from_str(value_expected).unwrap());
+      } else {
+        assert!(false, "unexpected value returned")
+      }      
+    }    
+
     #[test]
     #[ignore]
     fn test_json_extract_object_value_and_filter() {
@@ -414,6 +434,28 @@ mod tests {
 
       if let Some(_value_real) = value_real {
         assert_json_eq!(json!(_value_real), from_str(value_expected).unwrap());
+        assert_eq!(_value_real.len(), 1);
+      } else {
+        assert!(false, "unexpected value returned")
+      }
+    }
+    
+    // similar to previous test but uses internally (inside compare_array_with_str) assert_json_eq_no_panic
+    #[test]
+    fn test_compare_array_with_str () {
+      let parser = JsonParser::new(JSON);
+
+      let search_result = parser.search("queryResult.outputContexts").unwrap();
+      let value_real = JsonParser::extract_as_array(&search_result);
+
+      let value_expected = r#"[{
+        "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
+        "lifespanCount": 1
+      }]"#;
+
+      if let Some(_value_real) = value_real {
+        let result = JsonParser::compare_array_with_str(&_value_real, value_expected).unwrap();
+        assert_eq!(result, "__OK__");
         assert_eq!(_value_real.len(), 1);
       } else {
         assert!(false, "unexpected value returned")
