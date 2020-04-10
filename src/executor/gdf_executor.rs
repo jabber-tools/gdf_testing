@@ -23,29 +23,7 @@ use crate::gdf::{
     file_to_gdf_credentials
 };
 
-pub struct AssertionExecutionContext<'a> {
-    assertion: &'a TestAssertion<'a>, 
-    suite_type: &'a TestSuiteType, 
-    http_client: &'a reqwest::blocking::Client, 
-    conv_id: &'a str,
-    project_id: &'a str,
-    bearer: &'a str,
-}
-
-impl<'a> AssertionExecutionContext<'a> {
-    fn new_context(assertion: &'a TestAssertion, suite_type: &'a TestSuiteType, 
-    http_client: &'a reqwest::blocking::Client, conv_id: &'a str, 
-    project_id: &'a str, bearer: &'a str) -> Self {
-        AssertionExecutionContext {
-            assertion,
-            suite_type,
-            http_client,
-            conv_id,
-            project_id,
-            bearer
-        }
-    }
-}
+use crate::executor::{TestExecutor, AssertionExecutionContext};
 
 pub fn process_test(test: &Test, parent_suite: &TestSuite, project_id: &str) -> Result<()> {
     let http_client = reqwest::blocking::Client::new();
