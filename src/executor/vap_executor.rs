@@ -37,10 +37,10 @@ impl TestExecutor for VAPTestExecutor {
     }
 }
 
-/* impl Iterator for VAPTestExecutor {
+impl Iterator for VAPTestExecutor {
     type Item = TestAssertion;
 
     fn next(&mut self) -> Option<Self::Item> {
         None
     }
-} */
+}

@@ -25,7 +25,7 @@ use crate::gdf::{
 };
 
 pub struct AssertionExecutionContext<'a> {
-    assertion: &'a TestAssertion<'a>, 
+    assertion: &'a TestAssertion, 
     suite_type: &'a TestSuiteType, 
     http_client: &'a reqwest::blocking::Client, 
     conv_id: &'a str,

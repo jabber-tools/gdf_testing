@@ -27,7 +27,7 @@ use crate::executor::{TestExecutor, AssertionExecutionContext};
 
 pub fn process_test(test: &Test, parent_suite: &TestSuite, project_id: &str) -> Result<()> {
     let http_client = reqwest::blocking::Client::new();
-    let token = get_google_api_token(parent_suite.suite_spec.cred, &http_client)?;
+    let token = get_google_api_token(&parent_suite.suite_spec.cred, &http_client)?;
     let conv_id = GUID::rand().to_string();
     
     println!("");
@@ -51,7 +51,7 @@ pub fn process_assertion(context: &AssertionExecutionContext) -> Result<String> 
 // highly unoptimized and naive version of method for checking assertion response checks
 // we will have to do something with this terrifying code...
 pub fn process_assertion_response_check(response_check: &TestAssertionResponseCheck, response: &str) -> Result<()> {
-    match response_check.value {
+    match &response_check.value {
         
         TestAssertionResponseCheckValue::BoolVal(bool_val_expected) => {
             
@@ -59,11 +59,11 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 
                 TestAssertionResponseCheckOperator::Equals => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
 
                     let value = JsonParser::extract_as_bool(&search_result);
                     if let Some(bool_val_real) = value {
-                        if bool_val_real == bool_val_expected {
+                        if bool_val_real == *bool_val_expected {
                             return Ok(());
                         } else {
                             let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", bool_val_expected, bool_val_real, response_check.expression);
@@ -92,10 +92,10 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 
                 TestAssertionResponseCheckOperator::NotEquals => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
                     let value = JsonParser::extract_as_bool(&search_result);
                     if let Some(bool_val_real) = value {
-                        if bool_val_real != bool_val_expected {
+                        if bool_val_real != *bool_val_expected {
                             return Ok(());
                         } else {
                             let error_message = format!("Expected value ({}), got instead value: ({}) for expression: {}", !bool_val_expected, bool_val_real, response_check.expression);
@@ -117,7 +117,7 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 
                 TestAssertionResponseCheckOperator::Equals => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
                     let value = JsonParser::extract_as_string(&search_result);
                     if let Some(str_val_real) = value {
                         if str_val_real == str_val_expected {
@@ -134,7 +134,7 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 
                 TestAssertionResponseCheckOperator::Includes => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
                     let value = JsonParser::extract_as_string(&search_result);
                     if let Some(str_val_real) = value {
                         if str_val_real.contains(str_val_expected) == true {
@@ -151,13 +151,13 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 
                 TestAssertionResponseCheckOperator::JsonEquals => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
 
                     if JsonParser::get_jmespath_var_type(&search_result) == Some(JmespathType::Array) {
                        
                         let value = JsonParser::extract_as_array(&search_result);
                         if let Some(array_val_real) = value {
-                            let json_comparison_result = JsonParser::compare_array_with_str(&array_val_real, str_val_expected);
+                            let json_comparison_result = JsonParser::compare_array_with_str(&array_val_real, &str_val_expected);
 
                             match json_comparison_result {
                                 Ok(str_val) if str_val == "__OK__" => {},
@@ -179,7 +179,7 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
                         let value = JsonParser::extract_as_object(&search_result);
 
                         if let Some(obj_val_real) = value {
-                            let json_comparison_result = JsonParser::compare_object_with_str(&obj_val_real, str_val_expected);
+                            let json_comparison_result = JsonParser::compare_object_with_str(&obj_val_real, &str_val_expected);
 
                             match json_comparison_result {
                                 Ok(str_val) if str_val == "__OK__" => {},
@@ -210,7 +210,7 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 
                 TestAssertionResponseCheckOperator::NotEquals => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
                     let value = JsonParser::extract_as_string(&search_result);
                     if let Some(str_val_real) = value {
                         if str_val_real != str_val_expected {
@@ -235,10 +235,10 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
                 
                 TestAssertionResponseCheckOperator::Equals => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
                     let value = JsonParser::extract_as_number(&search_result);
                     if let Some(num_val_real) = value {
-                        if num_val_real == num_val_expected {
+                        if num_val_real == *num_val_expected {
                             return Ok(());
                         } else {
                             let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
@@ -263,13 +263,13 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
                 TestAssertionResponseCheckOperator::Length => {
                     // we do support length of arrays only, not lenght of strings or number of digits in number!
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
 
                     match JsonParser::get_jmespath_var_type(&search_result) {
                         Some(JmespathType::Array) => /* array type */ {
                             let value = JsonParser::extract_as_array(&search_result);
                             if let Some(arr_value) = value {
-                                if arr_value.len() == num_val_expected as usize { // TODO: num value in response check should be usize, f64 does not make sense if used only for array length comparison
+                                if arr_value.len() == *num_val_expected as usize { // TODO: num value in response check should be usize, f64 does not make sense if used only for array length comparison
                                     return Ok(());
                                 } else {
                                     let error_message = format!("Expected array length {}, got {} for expression: {}", num_val_expected, arr_value.len(), response_check.expression);
@@ -296,10 +296,10 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 
                 TestAssertionResponseCheckOperator::NotEquals => {
                     let parser = JsonParser::new(response);
-                    let search_result = parser.search(response_check.expression)?;
+                    let search_result = parser.search(&response_check.expression)?;
                     let value = JsonParser::extract_as_number(&search_result);
                     if let Some(num_val_real) = value {
-                        if num_val_real != num_val_expected {
+                        if num_val_real != *num_val_expected {
                             return Ok(());
                         } else {
                             let error_message = format!("Expected value not equal to ({}) got value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
@@ -321,14 +321,14 @@ pub fn process_assertion_response_check(response_check: &TestAssertionResponseCh
 pub fn invoke_gdf(context: &AssertionExecutionContext) -> Result<String> {
     // println!("calling Dialogflow with utterance '{}'", context.assertion.user_says);
 
-    let payload = prepare_dialogflow_request(context.assertion.user_says);
-    let resp = call_dialogflow(payload, context.project_id, context.conv_id, context.http_client , context.bearer)?;
+    let payload = prepare_dialogflow_request(&context.assertion.user_says);
+    let resp = call_dialogflow(payload, &context.project_id, &context.conv_id, context.http_client , &context.bearer)?;
     let parser = JsonParser::new(&resp);
     let realIntentName = parser.search("queryResult.intent.displayName")?;
     let realIntentName = JsonParser::extract_as_string(&realIntentName);
 
     if let Some(intentName) = realIntentName {
-        if !context.assertion.bot_responds_with.contains(&intentName) {
+        if !context.assertion.bot_responds_with.contains(&intentName.to_string()) {
             let error_message = format!("Wrong intent name received. Expected one of: '{}', got: '{}'", context.assertion.bot_responds_with.join(","), intentName);
             return Err(new_error(ErrorKind::InvalidTestAssertionEvaluation, error_message, None));
         }
@@ -464,7 +464,7 @@ mod tests {
         let yaml: &Yaml = &docs[0];
         
         let suite =  TestSuite::from_yaml(yaml)?;
-        let cred = file_to_gdf_credentials(suite.suite_spec.cred)?;
+        let cred = file_to_gdf_credentials(&suite.suite_spec.cred)?;
         let test_result = process_test(&suite.tests[0], &suite, &cred.project_id);
         if let Err(err) =  test_result {
             match *err.kind {
@@ -480,21 +480,21 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_str_equals() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action", 
+            String::from("queryResult.action"), 
             TestAssertionResponseCheckOperator::Equals,
-            TestAssertionResponseCheckValue::StrVal("input.welcome")
+            TestAssertionResponseCheckValue::StrVal(String::from("input.welcome"))
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action", 
+            String::from("queryResult.action"), 
             TestAssertionResponseCheckOperator::Equals,
-            TestAssertionResponseCheckValue::StrVal("foo.bar")
+            TestAssertionResponseCheckValue::StrVal(String::from("foo.bar"))
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action.does.not.exists", 
+            "queryResult.action.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::Equals,
-            TestAssertionResponseCheckValue::StrVal("foo.bar")
+            TestAssertionResponseCheckValue::StrVal("foo.bar".to_string())
         );
         
         assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
@@ -527,21 +527,21 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_str_includes() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action", 
+            "queryResult.action".to_string(), 
             TestAssertionResponseCheckOperator::Includes,
-            TestAssertionResponseCheckValue::StrVal("nput.welcom")
+            TestAssertionResponseCheckValue::StrVal("nput.welcom".to_string())
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action", 
+            "queryResult.action".to_string(), 
             TestAssertionResponseCheckOperator::Includes,
-            TestAssertionResponseCheckValue::StrVal("foo.bar")
+            TestAssertionResponseCheckValue::StrVal("foo.bar".to_string())
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action.does.not.exists", 
+            "queryResult.action.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::Includes,
-            TestAssertionResponseCheckValue::StrVal("foo.bar")
+            TestAssertionResponseCheckValue::StrVal("foo.bar".to_string())
         );
         
         assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
@@ -574,21 +574,21 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_str_not_equals() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action", 
+            "queryResult.action".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
-            TestAssertionResponseCheckValue::StrVal("foo.bar")
+            TestAssertionResponseCheckValue::StrVal("foo.bar".to_string())
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action", 
+            "queryResult.action".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
-            TestAssertionResponseCheckValue::StrVal("input.welcome")
+            TestAssertionResponseCheckValue::StrVal("input.welcome".to_string())
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action.does.not.exists", 
+            "queryResult.action.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
-            TestAssertionResponseCheckValue::StrVal("input.welcome")
+            TestAssertionResponseCheckValue::StrVal("input.welcome".to_string())
         );
         
         assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
@@ -621,9 +621,9 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_str_length() {
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.action", 
+            "queryResult.action".to_string(), 
             TestAssertionResponseCheckOperator::Length,
-            TestAssertionResponseCheckValue::StrVal("input.welcome")
+            TestAssertionResponseCheckValue::StrVal("input.welcome".to_string())
         );
 
         match process_assertion_response_check(&check_ko_1, JSON) {
@@ -642,7 +642,7 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_str_json_equals_arrays() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts", 
+            "queryResult.outputContexts".to_string(), 
             TestAssertionResponseCheckOperator::JsonEquals,
             TestAssertionResponseCheckValue::StrVal(r#"
             [
@@ -651,11 +651,11 @@ mod tests {
                   "lifespanCount": 1
                 }
             ]            
-            "#)
+            "#.to_string())
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts", 
+            "queryResult.outputContexts".to_string(), 
             TestAssertionResponseCheckOperator::JsonEquals,
             TestAssertionResponseCheckValue::StrVal(r#"
             [
@@ -664,13 +664,13 @@ mod tests {
                   "lifespanCount": 2
                 }
             ]            
-            "#)
+            "#.to_string())
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts.does.not.exists", 
+            "queryResult.outputContexts.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
-            TestAssertionResponseCheckValue::StrVal(r#"[{"foo": "bar"}]"#)
+            TestAssertionResponseCheckValue::StrVal(r#"[{"foo": "bar"}]"#.to_string())
         );
         
         assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
@@ -717,31 +717,31 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_str_json_equals_objects() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0]", 
+            "queryResult.outputContexts[0]".to_string(), 
             TestAssertionResponseCheckOperator::JsonEquals,
             TestAssertionResponseCheckValue::StrVal(r#"
                 {
                   "name": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
                   "lifespanCount": 1
                 }
-            "#)
+            "#.to_string())
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0]", 
+            "queryResult.outputContexts[0]".to_string(), 
             TestAssertionResponseCheckOperator::JsonEquals,
             TestAssertionResponseCheckValue::StrVal(r#"
                 {
                   "name2": "projects/express-cs-dummy/agent/sessions/98fe9b3d-fa99-53cf-062c-d20cfab9f123/contexts/tracking_prompt",
                   "lifespanCount": 2
                 }
-            "#)
+            "#.to_string())
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts.does.not.exists", 
+            "queryResult.outputContexts.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
-            TestAssertionResponseCheckValue::StrVal(r#"{"foo": "bar"}"#)
+            TestAssertionResponseCheckValue::StrVal(r#"{"foo": "bar"}"#.to_string())
         );
         
         assert_eq!(process_assertion_response_check(&check_ok, JSON).unwrap(), ());
@@ -793,19 +793,19 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_bool_equals() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::Equals,
             TestAssertionResponseCheckValue::BoolVal(true)
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::Equals,
             TestAssertionResponseCheckValue::BoolVal(false)
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent.does.not.exists", 
+            "queryResult.allRequiredParamsPresent.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::Equals,
             TestAssertionResponseCheckValue::BoolVal(true)
         );
@@ -840,19 +840,19 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_bool_not_equals() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
             TestAssertionResponseCheckValue::BoolVal(false)
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
             TestAssertionResponseCheckValue::BoolVal(true)
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent.does.not.exists", 
+            "queryResult.allRequiredParamsPresent.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
             TestAssertionResponseCheckValue::BoolVal(true)
         );
@@ -887,7 +887,7 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_bool_includes() {
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::Includes,
             TestAssertionResponseCheckValue::BoolVal(false)
         );
@@ -908,7 +908,7 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_bool_json_equals() {
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::JsonEquals,
             TestAssertionResponseCheckValue::BoolVal(false)
         );
@@ -929,7 +929,7 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_bool_length() {
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::Length,
             TestAssertionResponseCheckValue::BoolVal(false)
         );
@@ -950,19 +950,19 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_num_equals() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0].lifespanCount", 
+            "queryResult.outputContexts[0].lifespanCount".to_string(), 
             TestAssertionResponseCheckOperator::Equals,
             TestAssertionResponseCheckValue::NumVal(1_f64)
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0].lifespanCount", 
+            "queryResult.outputContexts[0].lifespanCount".to_string(), 
             TestAssertionResponseCheckOperator::Equals,
             TestAssertionResponseCheckValue::NumVal(2_f64)
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0].lifespanCount.does.not.exists", 
+            "queryResult.outputContexts[0].lifespanCount.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::Equals,
             TestAssertionResponseCheckValue::NumVal(1_f64)
         );
@@ -997,19 +997,19 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_num_not_equals() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0].lifespanCount", 
+            "queryResult.outputContexts[0].lifespanCount".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
             TestAssertionResponseCheckValue::NumVal(2.0)
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0].lifespanCount", 
+            "queryResult.outputContexts[0].lifespanCount".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
             TestAssertionResponseCheckValue::NumVal(1.0)
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0].lifespanCount.does.not.exists", 
+            "queryResult.outputContexts[0].lifespanCount.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::NotEquals,
             TestAssertionResponseCheckValue::NumVal(1_f64)
         );
@@ -1044,7 +1044,7 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_num_includes() {
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::Includes,
             TestAssertionResponseCheckValue::NumVal(1.0)
         );
@@ -1065,7 +1065,7 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_num_json_equals() {
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.allRequiredParamsPresent", 
+            "queryResult.allRequiredParamsPresent".to_string(), 
             TestAssertionResponseCheckOperator::JsonEquals,
             TestAssertionResponseCheckValue::NumVal(1.0)
         );
@@ -1086,25 +1086,25 @@ mod tests {
     #[test]
     fn test_process_assertion_response_check_num_length() {
         let check_ok: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts", 
+            "queryResult.outputContexts".to_string(), 
             TestAssertionResponseCheckOperator::Length,
             TestAssertionResponseCheckValue::NumVal(1_f64)
         );
 
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts", 
+            "queryResult.outputContexts".to_string(), 
             TestAssertionResponseCheckOperator::Length,
             TestAssertionResponseCheckValue::NumVal(2_f64)
         );
 
         let check_ko_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts.does.not.exists", 
+            "queryResult.outputContexts.does.not.exists".to_string(), 
             TestAssertionResponseCheckOperator::Length,
             TestAssertionResponseCheckValue::NumVal(1_f64)
         );
 
         let check_ko_3: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
-            "queryResult.outputContexts[0]", 
+            "queryResult.outputContexts[0]".to_string(), 
             TestAssertionResponseCheckOperator::Length,
             TestAssertionResponseCheckValue::NumVal(1_f64)
         );

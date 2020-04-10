@@ -1,7 +1,3 @@
-// This module is alternative to yaml_parser_old. Instaed of coping data from yaml document 
-// into heap it strictly uses references to original yaml data. This makes the implementation
-// clearer to read (no to_owned() calls, etc.) and more memory efficient 
-// (even though this is probably negligible for average size of yaml we will typically work with)
 use yaml_rust::Yaml;
 use crate::errors::{Result, ErrorKind, new_error_from, Error};
 
@@ -12,14 +8,14 @@ pub enum TestSuiteType {
 }
 
 #[derive(Debug)]
-pub struct TestSuiteSpec<'a> {
-    pub name: &'a str,
+pub struct TestSuiteSpec {
+    pub name: String,
     pub suite_type: TestSuiteType,
-    pub cred: &'a str
+    pub cred: String
 }
 
-impl<'a> TestSuiteSpec<'a> {
-    fn new(name: &'a str, suite_type: TestSuiteType, cred: &'a str) -> TestSuiteSpec<'a> {
+impl TestSuiteSpec {
+    fn new(name: String, suite_type: TestSuiteType, cred: String) -> TestSuiteSpec {
         TestSuiteSpec {
             name,
             suite_type,
@@ -29,14 +25,14 @@ impl<'a> TestSuiteSpec<'a> {
 }
 
 #[derive(Debug)]
-pub struct TestAssertion<'a> {
-    pub user_says: &'a str,
-    pub bot_responds_with: Vec<&'a str>,
-    pub response_checks: Vec<TestAssertionResponseCheck<'a>>
+pub struct TestAssertion {
+    pub user_says: String,
+    pub bot_responds_with: Vec<String>,
+    pub response_checks: Vec<TestAssertionResponseCheck>
 }
 
-impl<'a> TestAssertion<'a> {
-    pub fn new(user_says: &'a str, bot_responds_with: Vec<&'a str>, response_checks: Vec<TestAssertionResponseCheck<'a>>) -> TestAssertion<'a> {
+impl TestAssertion {
+    pub fn new(user_says: String, bot_responds_with: Vec<String>, response_checks: Vec<TestAssertionResponseCheck>) -> TestAssertion {
         TestAssertion {
             user_says,
             bot_responds_with,
@@ -55,21 +51,21 @@ pub enum TestAssertionResponseCheckOperator {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum TestAssertionResponseCheckValue<'a> {
-    StrVal(&'a str),
+pub enum TestAssertionResponseCheckValue {
+    StrVal(String),
     NumVal(f64),
     BoolVal(bool),
 }
 
 #[derive(Debug)]
-pub struct TestAssertionResponseCheck<'a> {
-    pub expression: &'a str,
+pub struct TestAssertionResponseCheck {
+    pub expression: String,
     pub operator: TestAssertionResponseCheckOperator,
-    pub value: TestAssertionResponseCheckValue<'a>
+    pub value: TestAssertionResponseCheckValue
 }
 
-impl<'a> TestAssertionResponseCheck<'a> {
-    pub fn new(expression: &'a str, operator: TestAssertionResponseCheckOperator, value: TestAssertionResponseCheckValue<'a>) -> Self {
+impl TestAssertionResponseCheck {
+    pub fn new(expression: String, operator: TestAssertionResponseCheckOperator, value: TestAssertionResponseCheckValue) -> Self {
         TestAssertionResponseCheck {
             expression,
             operator,
@@ -79,14 +75,14 @@ impl<'a> TestAssertionResponseCheck<'a> {
 }
 
 #[derive(Debug)]
-pub struct Test<'a> {
-    pub name: &'a str,
-    pub desc: Option<&'a str>,
-    pub assertions: Vec<TestAssertion<'a>>
+pub struct Test {
+    pub name: String,
+    pub desc: Option<String>,
+    pub assertions: Vec<TestAssertion>
 }
     
-impl<'a> Test<'a> {
-    pub fn new(name: &'a str, desc: Option<&'a str>) -> Test<'a> {
+impl Test {
+    pub fn new(name: String, desc: Option<String>) -> Test {
         Test {
             name: name,
             desc: desc,
@@ -96,18 +92,18 @@ impl<'a> Test<'a> {
 }
 
 #[derive(Debug)]
-pub struct TestSuite<'a> {
-    pub suite_spec: TestSuiteSpec<'a>,
-    pub tests: Vec<Test<'a>>
+pub struct TestSuite {
+    pub suite_spec: TestSuiteSpec,
+    pub tests: Vec<Test>
 }
 
 fn yaml_error(message: String) -> Error {
     new_error_from(ErrorKind::YamlParsingError(message))
 }  
 
-impl<'a> TestSuite<'a> {
+impl TestSuite {
 
-    pub fn new(suite_spec: TestSuiteSpec<'a>, tests: Vec<Test<'a>>) -> TestSuite<'a> {
+    pub fn new(suite_spec: TestSuiteSpec, tests: Vec<Test>) -> TestSuite {
         TestSuite {
             suite_spec,
             tests
@@ -115,7 +111,7 @@ impl<'a> TestSuite<'a> {
     }
 
 
-    fn retrieve_response_checks (yaml: &'a Yaml, test_name: &'a str, assertion_name: &'a str) -> Result<Vec<TestAssertionResponseCheck<'a>>> {
+    fn retrieve_response_checks (yaml: &Yaml, test_name: &str, assertion_name: &str) -> Result<Vec<TestAssertionResponseCheck>> {
         let response_checks = &yaml["responseChecks"];
         let response_checks = response_checks.as_vec();
         if let None = response_checks {
@@ -130,7 +126,6 @@ impl<'a> TestSuite<'a> {
             let value = &response_check["value"];
 
             if let None = expression {
-                // return Err(YamlParsingError(format!("expression name not specified for. test '{}', assertion: '{}'", test_name, assertion_name)))
                 return Err(yaml_error(format!("expression name not specified for. test '{}', assertion: '{}'", test_name, assertion_name)))
             }
 
@@ -153,12 +148,12 @@ impl<'a> TestSuite<'a> {
             let _value = match &*value {
                 Yaml::Integer(ival) => TestAssertionResponseCheckValue::NumVal(*ival as f64),
                 Yaml::Real(fval) => TestAssertionResponseCheckValue::NumVal(fval.parse::<f64>().unwrap()),
-                Yaml::String(sval) => TestAssertionResponseCheckValue::StrVal(sval),
+                Yaml::String(sval) => TestAssertionResponseCheckValue::StrVal(sval.to_string()),
                 Yaml::Boolean(bval) => TestAssertionResponseCheckValue::BoolVal(*bval),
                 _ => return Err(yaml_error(format!("unsupported value specified. test: '{}', assertion: '{}', expression: '{}'", test_name, assertion_name, expression)))
             };
 
-            test_assertion_response_check_vec.push(TestAssertionResponseCheck::new(expression, _operator, _value));
+            test_assertion_response_check_vec.push(TestAssertionResponseCheck::new(expression.to_string(), _operator, _value));
         }
 
         Ok(test_assertion_response_check_vec)
@@ -207,9 +202,9 @@ impl<'a> TestSuite<'a> {
             let mut test_to_push;
 
             if let None = test_desc {
-                test_to_push = Test::new(test_name.unwrap(), None);
+                test_to_push = Test::new(test_name.unwrap().to_string(), None);
             } else {
-                test_to_push = Test::new(test_name.unwrap(), Some(test_desc.unwrap()));
+                test_to_push = Test::new(test_name.unwrap().to_string(), Some(test_desc.unwrap().to_string()));
             }
 
             
@@ -232,8 +227,8 @@ impl<'a> TestSuite<'a> {
                 if let None = user_says {
                     return Err(yaml_error(format!("Test assertions missing userSays for {}", test_name.unwrap())));
                 }
-                let user_says = user_says.unwrap();
-                let mut bot_responses = vec![];
+                let user_says = user_says.unwrap().to_string();
+                let mut bot_responses:Vec<String> = vec![];
                 let bot_responds_with = test_assertion["botRespondsWith"].as_str();
                 if let None = bot_responds_with {
                     let bot_responds_with = test_assertion["botRespondsWith"].as_vec();
@@ -243,7 +238,7 @@ impl<'a> TestSuite<'a> {
                         let bot_responds_with = bot_responds_with.unwrap();
 
                         for bot_responds_with_str in bot_responds_with.iter() {
-                            let bot_responds_with_str = bot_responds_with_str.as_str().unwrap();
+                            let bot_responds_with_str = bot_responds_with_str.as_str().unwrap().to_string();
                             if bot_responds_with_str.trim()  == "" {
                                 return Err(yaml_error(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
                             }
@@ -251,13 +246,13 @@ impl<'a> TestSuite<'a> {
                         }
                     }
                 } else {
-                    let _bot_responds_with = bot_responds_with.unwrap();
+                    let _bot_responds_with = bot_responds_with.unwrap().to_string();
                     if _bot_responds_with.trim()  == "" {
                         return Err(yaml_error(format!("Test assertions botRespondsWith cannot be empty for {}", test_name.unwrap())));
                     }
                     bot_responses.push(_bot_responds_with);                        
                 }
-                let response_checks = TestSuite::retrieve_response_checks(test_assertion, test_name.unwrap(), user_says)?;
+                let response_checks = TestSuite::retrieve_response_checks(test_assertion, test_name.unwrap(), &user_says)?;
                 test_assertions_to_push.push(TestAssertion::new(user_says, bot_responses, response_checks));
 
                 }
@@ -268,7 +263,7 @@ impl<'a> TestSuite<'a> {
         Ok(
             TestSuite {
                 // we can safely unwrap now, None value is not possible here
-                suite_spec: TestSuiteSpec::new(name.unwrap(), suite_type.unwrap(), cred.unwrap()),
+                suite_spec: TestSuiteSpec::new(name.unwrap().to_string(), suite_type.unwrap(), cred.unwrap().to_string()),
                 tests: suite_tests
         }) 
     }
@@ -296,13 +291,13 @@ mod tests {
 
     #[test]
     fn compose_test_suite () {
-        let assertion1 = TestAssertion::new("Hi", vec!["Welcome","Welcome2"], vec![]);
-        let assertion2 = TestAssertion::new("whats up?", vec!["Smalltalk|Whats up"], vec![]);
+        let assertion1 = TestAssertion::new("Hi".to_string(), vec!["Welcome".to_string(),"Welcome2".to_string()], vec![]);
+        let assertion2 = TestAssertion::new("whats up?".to_string(), vec!["Smalltalk|Whats up".to_string()], vec![]);
         
-        let mut test1 = Test::new("Test1", None);
+        let mut test1 = Test::new("Test1".to_string(), None);
         test1.assertions = vec![assertion1, assertion2];
         
-        let suite_spec = TestSuiteSpec::new("Express Tracking", TestSuiteType::DialogFlow, "/path/to/cred");
+        let suite_spec = TestSuiteSpec::new("Express Tracking".to_string(), TestSuiteType::DialogFlow, "/path/to/cred".to_string());
 
         let suite = TestSuite::new(suite_spec, vec![test1]);
 
@@ -349,10 +344,10 @@ mod tests {
         assert_eq!(suite.tests.len(), 2);
         assert_eq!(suite.tests[0].name, "Welcome intent test");
         
-        let mut _desc = &suite.tests[1].desc;
+        let mut _desc = suite.tests[1].desc.as_ref();
         assert_eq!(_desc.unwrap(), "Tests default fallback intent");
 
-        _desc = &suite.tests[0].desc;
+        _desc = suite.tests[0].desc.as_ref();
         assert_eq!(_desc.unwrap(), "Tests default welcome intent");        
 
         assert_eq!(suite.tests[1].assertions.len(), 2);
@@ -871,7 +866,7 @@ mod tests {
         assert_eq!(suite.tests[1].assertions[1].response_checks.len(), 5);
         assert_eq!(suite.tests[1].assertions[1].response_checks[0].expression, "queryResult.action");
         assert_eq!(suite.tests[1].assertions[1].response_checks[0].operator, TestAssertionResponseCheckOperator::NotEquals);
-        assert_eq!(suite.tests[1].assertions[1].response_checks[0].value, TestAssertionResponseCheckValue::StrVal("action.foo"));
+        assert_eq!(suite.tests[1].assertions[1].response_checks[0].value, TestAssertionResponseCheckValue::StrVal("action.foo".to_string()));
 
         // thisl will not work because of whitespaces differences, we need to compare jsons in normalized way!
         /* assert_eq!(suite.tests[1].assertions[2].response_checks[2].value, TestAssertionResponseCheckValue::StrVal(r#"{
@@ -883,10 +878,10 @@ mod tests {
             "lifespanCount": 1
         }"#).unwrap();
 
-        match suite.tests[1].assertions[2].response_checks[2].value {
+        match &suite.tests[1].assertions[2].response_checks[2].value {
             TestAssertionResponseCheckValue::StrVal(str_val) => {
 
-                let parser = JsonParser::new(str_val);
+                let parser = JsonParser::new(&str_val);
 
                 // TBD: we need to find way how search/jmespath can access whole json
                 // if not possible real implementation must wrap the content by stuff placeholder implicitly
