@@ -12,35 +12,35 @@ use crate::yaml_parser::{
 use crate::errors::{Result, ErrorKind, new_error, Error};
 use crate::executor::{TestExecutor, AssertionExecutionContext};
 
-pub struct VAPTestExecutor {
-    vap_access_token: String
+pub struct VAPTestExecutor<'a> {
+    vap_access_token: String,
+    test: &'a Test,
+    parent_suite: &'a TestSuite
 }
 
-impl TestExecutor for VAPTestExecutor {
-    
-    fn new(config: HashMap<String, String>) -> Self {
+impl<'a> VAPTestExecutor<'a> {
+    pub fn new(vap_access_token: String, test: &'a Test, parent_suite: &'a TestSuite) -> Self {
         VAPTestExecutor {
-            vap_access_token: config.get("vap_access_token").unwrap().to_string()
+            vap_access_token,
+            test,
+            parent_suite
         }
     }
+}
 
-    fn process_test(test: &Test, parent_suite: &TestSuite, project_id: &str) -> Result<()> {
+impl<'a> TestExecutor for VAPTestExecutor<'a> {
+    
+    fn process_test(&self) -> Result<()> {
         Ok(())
     }
 
-    fn process_assertion(context: &AssertionExecutionContext) -> Result<()> {
-        Ok(())
-    }
-
-    fn process_assertion_response_check(response_check: &TestAssertionResponseCheck, response: &str) -> Result<()> {
-        Ok(())
+    fn process_assertion(&self, context: &AssertionExecutionContext) -> Result<String> {
+        Ok("".to_owned())
     }
 }
 
-impl Iterator for VAPTestExecutor {
-    type Item = TestAssertion;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        None
-    }
+pub fn invoke_vap(context: &AssertionExecutionContext) -> Result<String> {
+    // TBD...
+    println!("invoking VAP {}", context.assertion.user_says);
+    Ok("tbd...".to_owned())
 }
