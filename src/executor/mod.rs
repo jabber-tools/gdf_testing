@@ -3,7 +3,7 @@ use guid_create::GUID;
 use std::collections::HashMap;
 use yaml_rust::{YamlLoader, Yaml};
 
-use crate::errors::{Result, ErrorKind, new_error, Error};
+use crate::errors::{Result, ErrorKind, new_service_call_error, new_error, new_error_from, Error};
 use crate::json_parser::{
     JsonParser, 
     JmespathType
@@ -24,35 +24,20 @@ use crate::gdf::{
     file_to_gdf_credentials
 };
 
-pub struct AssertionExecutionContext<'a> {
-    assertion: &'a TestAssertion, 
-    http_client: &'a reqwest::blocking::Client, 
-    conv_id: &'a str,
-    project_id: &'a str,
-    bearer: &'a str,
-}
-
-impl<'a> AssertionExecutionContext<'a> {
-    fn new_context(assertion: &'a TestAssertion, http_client: &'a reqwest::blocking::Client, 
-    conv_id: &'a str, project_id: &'a str, bearer: &'a str) -> Self {
-        AssertionExecutionContext {
-            assertion,
-            http_client,
-            conv_id,
-            project_id,
-            bearer
-        }
-    }
-}
-
 mod gdf_executor;
 mod vap_executor;
 use crate::executor::vap_executor::VAPTestExecutor;
 use crate::executor::gdf_executor::GDFDefaultTestExecutor;
 
+// TBD:
+// https://doc.rust-lang.org/1.25.0/book/first-edition/associated-types.html
+// https://doc.rust-lang.org/reference/items/associated-items.html
+// https://doc.rust-lang.org/1.24.0/book/first-edition/trait-objects.html
+// provide default implementation for execute_next_assertion !
 pub trait TestExecutor {
-    fn process_test(&self) -> Result<()>;
-    fn process_assertion(&self, context: &AssertionExecutionContext) -> Result<String>;
+    fn next_assertion_details(&self) -> Option<&TestAssertion>;
+    fn execute_next_assertion(&mut self) -> Option<Result<String>>;
+    fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String>;
 }
 
 pub struct TestSuiteExecutor<'a> {
@@ -62,40 +47,54 @@ pub struct TestSuiteExecutor<'a> {
 }
 
 impl<'a> TestSuiteExecutor<'a> {
-    fn new(test_suite: &'a TestSuite, config: HashMap<String, String>) -> Self {
+    fn new(test_suite: &'a TestSuite, config: HashMap<String, String>) -> Result<Self> {
         
         let mut test_executors:Vec<Box<dyn TestExecutor>> = vec![];
 
         match test_suite.suite_spec.suite_type {
             TestSuiteType::DHLVAP => {
 
-                let access_token = config.get("access_token").unwrap();
+                let access_token = config.get("access_token");
+                if let None = access_token {
+                    return Err(new_error_from(ErrorKind::GenericError("access_token config value not found".to_owned())));            
+                }
+                let access_token = access_token.unwrap();
+
+                let vap_url = config.get("vap_url");
+                if let None = vap_url {
+                    return Err(new_error_from(ErrorKind::GenericError("vap_url config value not found".to_owned())));            
+                }
+                let vap_url = vap_url.unwrap();
 
                 for test in test_suite.tests.iter() {
-                    let _executor = Box::new(VAPTestExecutor::new(access_token.to_owned(), test, test_suite)) as Box<dyn TestExecutor>;
+                    let _executor = Box::new(VAPTestExecutor::new(access_token.to_owned(), vap_url.to_owned(), test, test_suite)?) as Box<dyn TestExecutor>;
                     test_executors.push(_executor);
                 }
 
-                TestSuiteExecutor {
+                Ok(TestSuiteExecutor {
                     test_suite,
                     config,
                     test_executors
-                }
+                })
             },
             TestSuiteType::DialogFlow => {
 
-                let credentials_file = config.get("credentials_file").unwrap();
-
+                let credentials_file = config.get("credentials_file");
+                if let None = credentials_file {
+                    return Err(new_error_from(ErrorKind::GenericError("credentials_file config value not found".to_owned())));            
+                }
+                let credentials_file = credentials_file.unwrap();
+        
                 for test in test_suite.tests.iter() {
-                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), test, test_suite)) as Box<dyn TestExecutor>;
+                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), test, test_suite)?) as Box<dyn TestExecutor>;
                     test_executors.push(_executor);
                 }
 
-                TestSuiteExecutor {
+                Ok(TestSuiteExecutor {
                     test_suite,
                     config,
                     test_executors
-                }
+                })
             },
         }
     }
@@ -113,11 +112,11 @@ impl<'a> TestSuiteExecutor<'a> {
                     return Ok(());
                 } else {
                     let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", bool_val_expected, bool_val_real, response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             } else {
                 let error_message = format!("Unable to retrieve boolean value ({}) for expression: {}", bool_val_expected, response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };
 
@@ -130,11 +129,11 @@ impl<'a> TestSuiteExecutor<'a> {
                     return Ok(());
                 } else {
                     let error_message = format!("Expected value ({}), got instead value: ({}) for expression: {}", !bool_val_expected, bool_val_real, response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             } else {
                 let error_message = format!("Unable to retrieve boolean value ({}) for expression: {}", !bool_val_expected, response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };
 
@@ -147,11 +146,11 @@ impl<'a> TestSuiteExecutor<'a> {
                     return Ok(());
                 } else {
                     let error_message = format!("Expected value '{}' does not match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             } else {
                 let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };
 
@@ -164,11 +163,11 @@ impl<'a> TestSuiteExecutor<'a> {
                     return Ok(());
                 } else {
                     let error_message = format!("Expected value '{}' not included in real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             } else {
                 let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };
 
@@ -186,16 +185,16 @@ impl<'a> TestSuiteExecutor<'a> {
                         Ok(str_val) if str_val == "__OK__" => return Ok(()),
                         Ok(err_msg) => {
                             let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                            return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                         },
                         Err(error) => {
                             let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, error);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                            return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                         }
                     }
                 } else {
                     let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             
             } else if JsonParser::get_jmespath_var_type(&search_result) == Some(JmespathType::Object) {
@@ -208,21 +207,21 @@ impl<'a> TestSuiteExecutor<'a> {
                         Ok(str_val) if str_val == "__OK__" => return Ok(()),
                         Ok(err_msg) => {
                             let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                            return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                         },
                         Err(error) => {
                             let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, error);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                            return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                         }
                     }
                 } else {
                     let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
                 
             } else {
                 let error_message = format!("Cannot apply jsonequals operator. Retrieved value is neither object nor array for expression: {}", response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };
 
@@ -235,11 +234,11 @@ impl<'a> TestSuiteExecutor<'a> {
                     return Ok(());
                 } else {
                     let error_message = format!("Expected value '{}' does match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             } else {
                 let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };
 
@@ -252,11 +251,11 @@ impl<'a> TestSuiteExecutor<'a> {
                     return Ok(());
                 } else {
                     let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             } else {
                 let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };
 
@@ -273,11 +272,11 @@ impl<'a> TestSuiteExecutor<'a> {
                                         return Ok(());
                                     } else {
                                         let error_message = format!("Expected array length {}, got {} for expression: {}", num_val_expected, arr_value.len(), response_check.expression);
-                                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                                        return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                                     }
                                 } else {
                                     let error_message = format!("Unable to retrieve array value for expression: {}", response_check.expression);
-                                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                                 }
         
                             },
@@ -285,11 +284,11 @@ impl<'a> TestSuiteExecutor<'a> {
                             Some(JmespathType::Null) |
                             None =>  {
                                 let error_message = format!("Unable to retrieve array value for expression: {}", response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                             },
                             Some(_) => /* some other type, e.g. object*/ {
                                 let error_message = format!("Operator length allowed for array expressions only. Expression: {}", response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                             }
                         }
         };
@@ -303,11 +302,11 @@ impl<'a> TestSuiteExecutor<'a> {
                     return Ok(());
                 } else {
                     let error_message = format!("Expected value not equal to ({}) got value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
-                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
                 }
             } else {
                 let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
-                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None, Some(response.to_owned())));
             }
         };        
 
@@ -365,8 +364,6 @@ impl<'a> TestSuiteExecutor<'a> {
                 }
             }
         }
-    
-        Ok(())        
     }    
 } 
 

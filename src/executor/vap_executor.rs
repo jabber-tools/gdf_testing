@@ -10,37 +10,38 @@ use crate::yaml_parser::{
     TestAssertionResponseCheck
 };
 use crate::errors::{Result, ErrorKind, new_error, Error};
-use crate::executor::{TestExecutor, AssertionExecutionContext};
+use crate::executor::{TestExecutor};
 
 pub struct VAPTestExecutor<'a> {
     vap_access_token: String,
+    vap_url: String,
     test: &'a Test,
     parent_suite: &'a TestSuite
 }
 
 impl<'a> VAPTestExecutor<'a> {
-    pub fn new(vap_access_token: String, test: &'a Test, parent_suite: &'a TestSuite) -> Self {
-        VAPTestExecutor {
+    pub fn new(vap_access_token: String, vap_url: String, test: &'a Test, parent_suite: &'a TestSuite) -> Result<Self> {
+        Ok(VAPTestExecutor {
             vap_access_token,
+            vap_url,
             test,
-            parent_suite
-        }
+            parent_suite,
+        })
     }
 }
 
 impl<'a> TestExecutor for VAPTestExecutor<'a> {
     
-    fn process_test(&self) -> Result<()> {
-        Ok(())
+    fn next_assertion_details(&self) -> Option<&TestAssertion> {
+        None
+    }    
+
+    fn execute_next_assertion(&mut self) -> Option<Result<String>> {
+        None
     }
 
-    fn process_assertion(&self, context: &AssertionExecutionContext) -> Result<String> {
+    fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
         Ok("".to_owned())
     }
-}
 
-fn invoke_vap(context: &AssertionExecutionContext) -> Result<String> {
-    // TBD...
-    println!("invoking VAP {}", context.assertion.user_says);
-    Ok("tbd...".to_owned())
 }

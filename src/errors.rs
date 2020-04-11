@@ -49,7 +49,8 @@ impl fmt::Display for ErrorKind {
 pub struct Error {
     pub kind: Box<ErrorKind>,
     pub message: String,
-    pub code: Option<String>
+    pub code: Option<String>,
+    pub backend_response: Option<String>,
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -60,7 +61,9 @@ pub(crate) fn new_error_from(kind: ErrorKind) -> Error {
     Error {
         kind: Box::new(kind),
         message: message,
-        code: None
+        code: None,
+        backend_response: None // used to capture Google DialogFlow or VAP response for final error report. 
+                               //User must see what went wrong while evaluating response from DialogFlow/VAP
     }
 }
 
@@ -68,7 +71,17 @@ pub(crate) fn new_error(kind: ErrorKind, message: String, code: Option<String>) 
     Error {
         kind: Box::new(kind),
         message,
-        code
+        code,
+        backend_response: None
+    }
+}
+
+pub(crate) fn new_service_call_error(kind: ErrorKind, message: String, code: Option<String>, backend_response: Option<String>) -> Error {
+    Error {
+        kind: Box::new(kind),
+        message,
+        code,
+        backend_response
     }
 }
 
