@@ -67,7 +67,7 @@ impl<'a> TestExecutor for GDFDefaultTestExecutor<'a> {
     }
 }
 
-pub fn invoke_gdf(context: &AssertionExecutionContext) -> Result<String> {
+fn invoke_gdf(context: &AssertionExecutionContext) -> Result<String> {
     // println!("calling Dialogflow with utterance '{}'", context.assertion.user_says);
 
     let payload = prepare_dialogflow_request(&context.assertion.user_says);
@@ -92,9 +92,10 @@ pub fn invoke_gdf(context: &AssertionExecutionContext) -> Result<String> {
 mod tests {
     use super::*;
 
+    
     // cargo test -- --show-output test_process_test
     #[test]
-    #[ignore]
+    //#[ignore]
     fn test_process_test() -> Result<()> {
 
         const YAML_STR: &str =
@@ -110,7 +111,7 @@ mod tests {
                 - userSays: 'Hello'
                   botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
                 - userSays: 'track a package'
-                  botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
+                  botRespondsWith: ['Tracking|CS|0|Prompt|Gen2']
        ";           
 
         let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
@@ -135,6 +136,7 @@ mod tests {
             }
         }
         Ok(())
-    }
+    }        
+
 }
     

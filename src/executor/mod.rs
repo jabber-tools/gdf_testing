@@ -100,219 +100,167 @@ impl<'a> TestSuiteExecutor<'a> {
         }
     }
 
-    // TBD: split into separate functions to improve readability!
+
     pub fn process_assertion_response_check(response_check: &TestAssertionResponseCheck, response: &str) -> Result<()> {
-       
-        match &response_check.value {
-        
-            TestAssertionResponseCheckValue::BoolVal(bool_val_expected) => {
-                
-                match response_check.operator {
-    
-                    TestAssertionResponseCheckOperator::Equals => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-    
-                        let value = JsonParser::extract_as_bool(&search_result);
-                        if let Some(bool_val_real) = value {
-                            if bool_val_real == *bool_val_expected {
-                                return Ok(());
-                            } else {
-                                let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", bool_val_expected, bool_val_real, response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        } else {
-                            let error_message = format!("Unable to retrieve boolean value ({}) for expression: {}", bool_val_expected, response_check.expression);
+        /// HELPER closures ///
+        let process_bool_equals = |bool_val_expected: &bool| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+
+            let value = JsonParser::extract_as_bool(&search_result);
+            if let Some(bool_val_real) = value {
+                if bool_val_real == *bool_val_expected {
+                    return Ok(());
+                } else {
+                    let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", bool_val_expected, bool_val_real, response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                }
+            } else {
+                let error_message = format!("Unable to retrieve boolean value ({}) for expression: {}", bool_val_expected, response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };
+
+        let process_bool_not_equals = |bool_val_expected: &bool| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+            let value = JsonParser::extract_as_bool(&search_result);
+            if let Some(bool_val_real) = value {
+                if bool_val_real != *bool_val_expected {
+                    return Ok(());
+                } else {
+                    let error_message = format!("Expected value ({}), got instead value: ({}) for expression: {}", !bool_val_expected, bool_val_real, response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                }
+            } else {
+                let error_message = format!("Unable to retrieve boolean value ({}) for expression: {}", !bool_val_expected, response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };
+
+        let process_string_equals = |str_val_expected: &String| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+            let value = JsonParser::extract_as_string(&search_result);
+            if let Some(str_val_real) = value {
+                if str_val_real == str_val_expected {
+                    return Ok(());
+                } else {
+                    let error_message = format!("Expected value '{}' does not match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                }
+            } else {
+                let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };
+
+        let process_string_includes = |str_val_expected: &String| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+            let value = JsonParser::extract_as_string(&search_result);
+            if let Some(str_val_real) = value {
+                if str_val_real.contains(str_val_expected) == true {
+                    return Ok(());
+                } else {
+                    let error_message = format!("Expected value '{}' not included in real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                }
+            } else {
+                let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };
+
+        let process_string_json_equals = |str_val_expected: &String| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+
+            if JsonParser::get_jmespath_var_type(&search_result) == Some(JmespathType::Array) {
+               
+                let value = JsonParser::extract_as_array(&search_result);
+                if let Some(array_val_real) = value {
+                    let json_comparison_result = JsonParser::compare_array_with_str(&array_val_real, &str_val_expected);
+
+                    match json_comparison_result {
+                        Ok(str_val) if str_val == "__OK__" => return Ok(()),
+                        Ok(err_msg) => {
+                            let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                        }
-                    },
-    
-                    TestAssertionResponseCheckOperator::Includes => {
-                        let error_message = format!("Operator includes not allowed for boolean value of expression: {}", response_check.expression);
-                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                    },
-    
-                    TestAssertionResponseCheckOperator::JsonEquals => {
-                        let error_message = format!("Operator jsonequals not allowed for boolean value of expression: {}", response_check.expression);
-                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                    },
-    
-                    TestAssertionResponseCheckOperator::Length => {
-                        let error_message = format!("Operator length not allowed for boolean value of expression: {}", response_check.expression);
-                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                    },
-    
-                    TestAssertionResponseCheckOperator::NotEquals => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-                        let value = JsonParser::extract_as_bool(&search_result);
-                        if let Some(bool_val_real) = value {
-                            if bool_val_real != *bool_val_expected {
-                                return Ok(());
-                            } else {
-                                let error_message = format!("Expected value ({}), got instead value: ({}) for expression: {}", !bool_val_expected, bool_val_real, response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        } else {
-                            let error_message = format!("Unable to retrieve boolean value ({}) for expression: {}", !bool_val_expected, response_check.expression);
+                        },
+                        Err(error) => {
+                            let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, error);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     }
-    
+                } else {
+                    let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                 }
-    
-            },
-    
-            TestAssertionResponseCheckValue::StrVal(str_val_expected) => {
-                
-                match response_check.operator {
-    
-                    TestAssertionResponseCheckOperator::Equals => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-                        let value = JsonParser::extract_as_string(&search_result);
-                        if let Some(str_val_real) = value {
-                            if str_val_real == str_val_expected {
-                                return Ok(());
-                            } else {
-                                let error_message = format!("Expected value '{}' does not match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        } else {
-                            let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
+            
+            } else if JsonParser::get_jmespath_var_type(&search_result) == Some(JmespathType::Object) {
+                let value = JsonParser::extract_as_object(&search_result);
+
+                if let Some(obj_val_real) = value {
+                    let json_comparison_result = JsonParser::compare_object_with_str(&obj_val_real, &str_val_expected);
+
+                    match json_comparison_result {
+                        Ok(str_val) if str_val == "__OK__" => return Ok(()),
+                        Ok(err_msg) => {
+                            let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                        }
-                    },
-    
-                    TestAssertionResponseCheckOperator::Includes => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-                        let value = JsonParser::extract_as_string(&search_result);
-                        if let Some(str_val_real) = value {
-                            if str_val_real.contains(str_val_expected) == true {
-                                return Ok(());
-                            } else {
-                                let error_message = format!("Expected value '{}' not included in real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        } else {
-                            let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                        }
-                    },
-    
-                    TestAssertionResponseCheckOperator::JsonEquals => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-    
-                        if JsonParser::get_jmespath_var_type(&search_result) == Some(JmespathType::Array) {
-                           
-                            let value = JsonParser::extract_as_array(&search_result);
-                            if let Some(array_val_real) = value {
-                                let json_comparison_result = JsonParser::compare_array_with_str(&array_val_real, &str_val_expected);
-    
-                                match json_comparison_result {
-                                    Ok(str_val) if str_val == "__OK__" => {},
-                                    Ok(err_msg) => {
-                                        let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
-                                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                                    },
-                                    Err(error) => {
-                                        let error_message = format!("Arrays not matching for expression '{}'. Error: {}", response_check.expression, error);
-                                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                                    }
-                                }
-                            } else {
-                                let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        
-                        } else if JsonParser::get_jmespath_var_type(&search_result) == Some(JmespathType::Object) {
-                            let value = JsonParser::extract_as_object(&search_result);
-    
-                            if let Some(obj_val_real) = value {
-                                let json_comparison_result = JsonParser::compare_object_with_str(&obj_val_real, &str_val_expected);
-    
-                                match json_comparison_result {
-                                    Ok(str_val) if str_val == "__OK__" => {},
-                                    Ok(err_msg) => {
-                                        let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, err_msg);
-                                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                                    },
-                                    Err(error) => {
-                                        let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, error);
-                                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                                    }
-                                }
-                            } else {
-                                let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                            
-                        } else {
-                            let error_message = format!("Cannot apply jsonequals operator. Retrieved value is neither object nor array for expression: {}", response_check.expression);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                        }
-                    },
-    
-                    TestAssertionResponseCheckOperator::Length => {
-                        let error_message = format!("Operator length not allowed for string value of expression: '{}'. If value is '4' use 4 instead.", response_check.expression);
-                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                    },
-    
-                    TestAssertionResponseCheckOperator::NotEquals => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-                        let value = JsonParser::extract_as_string(&search_result);
-                        if let Some(str_val_real) = value {
-                            if str_val_real != str_val_expected {
-                                return Ok(());
-                            } else {
-                                let error_message = format!("Expected value '{}' does match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        } else {
-                            let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
+                        },
+                        Err(error) => {
+                            let error_message = format!("Objects not matching for expression '{}'. Error: {}", response_check.expression, error);
                             return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                         }
                     }
-    
+                } else {
+                    let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                 }
-    
-            },
-    
-            TestAssertionResponseCheckValue::NumVal(num_val_expected) => {
                 
-                match response_check.operator {
-                    
-                    TestAssertionResponseCheckOperator::Equals => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-                        let value = JsonParser::extract_as_number(&search_result);
-                        if let Some(num_val_real) = value {
-                            if num_val_real == *num_val_expected {
-                                return Ok(());
-                            } else {
-                                let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        } else {
-                            let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                        }
-                    },
-    
-                    TestAssertionResponseCheckOperator::Includes => {
-                        let error_message = format!("Operator includes not allowed for numeric value of expression: {}", response_check.expression);
-                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                    },
-    
-                    TestAssertionResponseCheckOperator::JsonEquals => {
-                        let error_message = format!("Operator jsonequals not allowed for numeric value of expression: {}", response_check.expression);
-                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                    },
-    
-                    TestAssertionResponseCheckOperator::Length => {
+            } else {
+                let error_message = format!("Cannot apply jsonequals operator. Retrieved value is neither object nor array for expression: {}", response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };
+
+        let process_string_not_equals = |str_val_expected: &String| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+            let value = JsonParser::extract_as_string(&search_result);
+            if let Some(str_val_real) = value {
+                if str_val_real != str_val_expected {
+                    return Ok(());
+                } else {
+                    let error_message = format!("Expected value '{}' does match real value: '{}' for expression: {}", str_val_expected, str_val_real, response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                }
+            } else {
+                let error_message = format!("Unable to retrieve string value for expression: {}", response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };
+
+        let process_num_equals = |num_val_expected: &f64| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+            let value = JsonParser::extract_as_number(&search_result);
+            if let Some(num_val_real) = value {
+                if num_val_real == *num_val_expected {
+                    return Ok(());
+                } else {
+                    let error_message = format!("Expected value ({}) does not match real value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                }
+            } else {
+                let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };
+
+        let process_num_length = |num_val_expected: &f64| -> Result<()> {
                         // we do support length of arrays only, not lenght of strings or number of digits in number!
                         let parser = JsonParser::new(response);
                         let search_result = parser.search(&response_check.expression)?;
@@ -344,31 +292,81 @@ impl<'a> TestSuiteExecutor<'a> {
                                 return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                             }
                         }
+        };
+        
+        let process_num_not_equals = |num_val_expected: &f64| -> Result<()> {
+            let parser = JsonParser::new(response);
+            let search_result = parser.search(&response_check.expression)?;
+            let value = JsonParser::extract_as_number(&search_result);
+            if let Some(num_val_real) = value {
+                if num_val_real != *num_val_expected {
+                    return Ok(());
+                } else {
+                    let error_message = format!("Expected value not equal to ({}) got value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
+                    return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                }
+            } else {
+                let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
+                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+            }
+        };        
+
+        /// MAIN processing logic of the function utilizing closures defined above ///
+        match &response_check.value {
+        
+            TestAssertionResponseCheckValue::BoolVal(bool_val_expected) => {
+                
+                match response_check.operator {
+                    TestAssertionResponseCheckOperator::Equals => return process_bool_equals(bool_val_expected),
+                    TestAssertionResponseCheckOperator::Includes => {
+                        let error_message = format!("Operator includes not allowed for boolean value of expression: {}", response_check.expression);
+                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
                     },
-    
-                    TestAssertionResponseCheckOperator::NotEquals => {
-                        let parser = JsonParser::new(response);
-                        let search_result = parser.search(&response_check.expression)?;
-                        let value = JsonParser::extract_as_number(&search_result);
-                        if let Some(num_val_real) = value {
-                            if num_val_real != *num_val_expected {
-                                return Ok(());
-                            } else {
-                                let error_message = format!("Expected value not equal to ({}) got value: ({}) for expression: {}", num_val_expected, num_val_real, response_check.expression);
-                                return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                            }
-                        } else {
-                            let error_message = format!("Unable to retrieve numerical value for expression: {}", response_check.expression);
-                            return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
-                        }
-                    }
+                    TestAssertionResponseCheckOperator::JsonEquals => {
+                        let error_message = format!("Operator jsonequals not allowed for boolean value of expression: {}", response_check.expression);
+                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    },
+                    TestAssertionResponseCheckOperator::Length => {
+                        let error_message = format!("Operator length not allowed for boolean value of expression: {}", response_check.expression);
+                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    },
+                    TestAssertionResponseCheckOperator::NotEquals => return process_bool_not_equals(bool_val_expected)
                 }
     
+            },
+    
+            TestAssertionResponseCheckValue::StrVal(str_val_expected) => {
+                match response_check.operator {
+                    TestAssertionResponseCheckOperator::Equals => return process_string_equals(str_val_expected),
+                    TestAssertionResponseCheckOperator::Includes => return process_string_includes(str_val_expected),
+                    TestAssertionResponseCheckOperator::JsonEquals => return process_string_json_equals(str_val_expected),
+                    TestAssertionResponseCheckOperator::Length => {
+                        let error_message = format!("Operator length not allowed for string value of expression: '{}'. If value is '4' use 4 instead.", response_check.expression);
+                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    },
+                    TestAssertionResponseCheckOperator::NotEquals => return process_string_not_equals(str_val_expected)
+                }
+    
+            },
+    
+            TestAssertionResponseCheckValue::NumVal(num_val_expected) => {
+                match response_check.operator {
+                    TestAssertionResponseCheckOperator::Equals => return process_num_equals(num_val_expected),
+                    TestAssertionResponseCheckOperator::Includes => {
+                        let error_message = format!("Operator includes not allowed for numeric value of expression: {}", response_check.expression);
+                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    },
+                    TestAssertionResponseCheckOperator::JsonEquals => {
+                        let error_message = format!("Operator jsonequals not allowed for numeric value of expression: {}", response_check.expression);
+                        return Err(new_error(ErrorKind::InvalidTestAssertionResponseCheckEvaluation, error_message, None));
+                    },
+                    TestAssertionResponseCheckOperator::Length => return process_num_length(num_val_expected),
+                    TestAssertionResponseCheckOperator::NotEquals => return process_num_not_equals(num_val_expected)
+                }
             }
         }
     
         Ok(())        
-
     }    
 } 
 

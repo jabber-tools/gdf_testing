@@ -39,7 +39,7 @@ impl<'a> TestExecutor for VAPTestExecutor<'a> {
     }
 }
 
-pub fn invoke_vap(context: &AssertionExecutionContext) -> Result<String> {
+fn invoke_vap(context: &AssertionExecutionContext) -> Result<String> {
     // TBD...
     println!("invoking VAP {}", context.assertion.user_says);
     Ok("tbd...".to_owned())
