@@ -44,7 +44,7 @@ impl<'a> GDFDefaultTestExecutor<'a> {
     pub fn new(credentials_file: String, test: &'a Test, parent_suite: &'a TestSuite) -> Result<Self> {
 
         let http_client = HttpClient::new();
-        let token = get_google_api_token(&parent_suite.suite_spec.cred, &http_client)?;
+        let token = get_google_api_token(&credentials_file, &http_client)?;
         let conv_id = GUID::rand().to_string();
         let cred = file_to_gdf_credentials(&credentials_file)?;
 
@@ -70,9 +70,10 @@ impl<'a> TestExecutor for GDFDefaultTestExecutor<'a> {
         }
     }
     fn execute_next_assertion(&mut self) -> Option<Result<String>> {
-        
-        let result = if self.next_assertion >= self.test.assertions.len() {
-            None
+        // println!("next_assertion={}",self.next_assertion);
+        if self.next_assertion >= self.test.assertions.len() {
+            self.next_assertion = self.next_assertion + 1;
+            return None;
         } else {
             let assertion_to_execute = &self.test.assertions[self.next_assertion];
 
@@ -80,6 +81,7 @@ impl<'a> TestExecutor for GDFDefaultTestExecutor<'a> {
 
             if let Err(intent_mismatch_error) = assertion_response {
                 // if intent name does not match expected value do not continue
+                self.next_assertion = self.next_assertion + 1;
                 return Some(Err(intent_mismatch_error));
             }
 
@@ -90,15 +92,14 @@ impl<'a> TestExecutor for GDFDefaultTestExecutor<'a> {
                 let response_check_result = TestSuiteExecutor::process_assertion_response_check(response_check, &assertion_response);
 
                 if let Err(some_response_check_error) = response_check_result {
+                    self.next_assertion = self.next_assertion + 1;
                     return Some(Err(some_response_check_error));
                 }
             } 
-
-            Some(Ok(assertion_response))
+            
+            self.next_assertion = self.next_assertion + 1;
+            return Some(Ok(assertion_response));
         };
-
-        self.next_assertion = self.next_assertion + 1;
-        result
     }    
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
 
@@ -128,7 +129,7 @@ mod tests {
     
     // cargo test -- --show-output test_process_test
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_process_test() -> Result<()> {
 
         const YAML_STR: &str =
@@ -145,6 +146,10 @@ mod tests {
                   botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
                 - userSays: 'track a package'
                   botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
+                  responseChecks:
+                    - expression: 'queryResult.allRequiredParamsPresent'
+                      operator: 'equals'
+                      value: true
        ";           
 
         let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
@@ -158,47 +163,35 @@ mod tests {
         );
 
         let mut suite_executor = TestSuiteExecutor::new(&suite, config_map)?;
-        let _box_mut_ref = &mut suite_executor.test_executors[0];
+        let test1_executor = &mut suite_executor.test_executors[0];
 
-        println!("Saying {}", _box_mut_ref.next_assertion_details().unwrap().user_says);
-        let test_result = _box_mut_ref.execute_next_assertion().unwrap();
+        while true {
+            println!();
+            let details_result = test1_executor.next_assertion_details();
 
-        println!("Saying {}", _box_mut_ref.next_assertion_details().unwrap().user_says);
-        let test_result = _box_mut_ref.execute_next_assertion().unwrap();
-
-        let test_result = _box_mut_ref.execute_next_assertion();
-        match test_result {
-            None => {},
-            _ => assert!(false, "expected None")
-        }
-
-
-        // https://stackoverflow.com/questions/41301239/how-to-unbox-elements-contained-in-polymorphic-vectors
-        // let test1_executor = *suite_executor.test_executors[0]; //unbox test executor
-
-        /*while true {
-            let next_assertion = test1_executor.test.assertions[test1_executor.next_assertion];
-            println!("Saying {}", next_assertion.user_says);
-            let test_result = suite_executor.test_executors[0].execute_next_assertion();
-
-            if let test_result = None {
-                break;
+            if let None = details_result {
+                println!("all assertions processed!");
+                break; // all asertions were processed -> break
             }
 
-            let test_result = test_result.unwrap();
+            let user_says = &details_result.unwrap().user_says;
 
-            if let Err(err) =  test_result {
+            print!("Saying {}", user_says);
+            let assertion_result = test1_executor.execute_next_assertion().unwrap();
+
+            if let Err(err) =  assertion_result {
                 match *err.kind {
                     ErrorKind::InvalidTestAssertionEvaluation => {
-                        println!(" - ko! {}", err.message);
+                        print!(" - ko! {}", err.message);
                     },
-                    _ =>  println!(" - ko! {}", err)
+                    _ =>  print!(" - ko! {}", err)
                 }
+            } else {
+                print!(" - ok!");
             }
-        }*/
+        }        
 
         Ok(())
     }        
-
 }
     
