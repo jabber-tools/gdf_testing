@@ -61,46 +61,19 @@ impl<'a> GDFDefaultTestExecutor<'a> {
 }
 
 impl<'a> TestExecutor for GDFDefaultTestExecutor<'a> {
-    fn next_assertion_details(&self) -> Option<&TestAssertion> {
-        if self.next_assertion >= self.test.assertions.len() {
-            None
-        } else {
-            let assertion_to_execute = &self.test.assertions[self.next_assertion];
-            Some(assertion_to_execute)
-        }
+
+    fn move_to_next_assertion(&mut self) {
+        self.next_assertion = self.next_assertion + 1;
     }
-    fn execute_next_assertion(&mut self) -> Option<Result<String>> {
-        // println!("next_assertion={}",self.next_assertion);
-        if self.next_assertion >= self.test.assertions.len() {
-            self.next_assertion = self.next_assertion + 1;
-            return None;
-        } else {
-            let assertion_to_execute = &self.test.assertions[self.next_assertion];
 
-            let assertion_response = self.invoke_nlp(assertion_to_execute);
+    fn get_assertions(&self) -> &Vec<TestAssertion> {
+        &self.test.assertions
+    }
 
-            if let Err(intent_mismatch_error) = assertion_response {
-                // if intent name does not match expected value do not continue
-                self.next_assertion = self.next_assertion + 1;
-                return Some(Err(intent_mismatch_error));
-            }
+    fn get_next_assertion_no(&self) -> usize {
+        self.next_assertion
+    }
 
-            // otherwise try to run assertion response checks
-            let assertion_response = assertion_response.unwrap();
-
-            for response_check in &assertion_to_execute.response_checks {
-                let response_check_result = TestSuiteExecutor::process_assertion_response_check(response_check, &assertion_response);
-
-                if let Err(some_response_check_error) = response_check_result {
-                    self.next_assertion = self.next_assertion + 1;
-                    return Some(Err(some_response_check_error));
-                }
-            } 
-            
-            self.next_assertion = self.next_assertion + 1;
-            return Some(Ok(assertion_response));
-        };
-    }    
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
 
         let payload = prepare_dialogflow_request(&assertion.user_says);

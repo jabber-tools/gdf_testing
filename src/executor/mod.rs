@@ -29,15 +29,64 @@ mod vap_executor;
 use crate::executor::vap_executor::VAPTestExecutor;
 use crate::executor::gdf_executor::GDFDefaultTestExecutor;
 
-// TBD:
-// https://doc.rust-lang.org/1.25.0/book/first-edition/associated-types.html
-// https://doc.rust-lang.org/reference/items/associated-items.html
-// https://doc.rust-lang.org/1.24.0/book/first-edition/trait-objects.html
-// provide default implementation for execute_next_assertion !
 pub trait TestExecutor {
-    fn next_assertion_details(&self) -> Option<&TestAssertion>;
-    fn execute_next_assertion(&mut self) -> Option<Result<String>>;
+    // helper abstaract methods so that we can use default implementations for next_assertion_details/execute_next_assertion
+    fn move_to_next_assertion(&mut self);
+    fn get_assertions(&self) -> &Vec<TestAssertion>;
+    fn get_next_assertion_no(&self) -> usize;
+    //
+    // core abstract method to be provided for every test executor //
+    //
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String>;
+
+    // these default implementation hardcode default flow for convenience
+    // every test executor can than focus on invoke_nlp only
+    fn next_assertion_details(&self) -> Option<&TestAssertion> {
+        let next_assertion_no = self.get_next_assertion_no();
+        let assertions = self.get_assertions();
+
+        if next_assertion_no >= assertions.len() {
+            None
+        } else {
+            let assertion_to_execute = &assertions[next_assertion_no];
+            Some(assertion_to_execute)
+        }
+    }
+    fn execute_next_assertion(&mut self) -> Option<Result<String>> {
+
+        let next_assertion_no = self.get_next_assertion_no();
+        let assertions = self.get_assertions();
+
+        if next_assertion_no >= assertions.len() {
+            self.move_to_next_assertion();
+            return None;
+        } else {
+            let assertion_to_execute = &assertions[next_assertion_no];
+
+            let assertion_response = self.invoke_nlp(assertion_to_execute);
+
+            if let Err(intent_mismatch_error) = assertion_response {
+                // if intent name does not match expected value do not continue
+                self.move_to_next_assertion();
+                return Some(Err(intent_mismatch_error));
+            }
+
+            // otherwise try to run assertion response checks
+            let assertion_response = assertion_response.unwrap();
+
+            for response_check in &assertion_to_execute.response_checks {
+                let response_check_result = TestSuiteExecutor::process_assertion_response_check(response_check, &assertion_response);
+
+                if let Err(some_response_check_error) = response_check_result {
+                    self.move_to_next_assertion();
+                    return Some(Err(some_response_check_error));
+                }
+            } 
+            
+            self.move_to_next_assertion();
+            return Some(Ok(assertion_response));
+        };
+    }    
 }
 
 pub struct TestSuiteExecutor<'a> {
