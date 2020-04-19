@@ -1,5 +1,6 @@
 use yaml_rust::Yaml;
 use crate::errors::{Result, ErrorKind, new_error_from, Error};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum TestSuiteType {
@@ -11,15 +12,15 @@ pub enum TestSuiteType {
 pub struct TestSuiteSpec {
     pub name: String,
     pub suite_type: TestSuiteType,
-    pub cred: String
+    pub config: HashMap<String, String>
 }
 
 impl TestSuiteSpec {
-    fn new(name: String, suite_type: TestSuiteType, cred: String) -> TestSuiteSpec {
+    fn new(name: String, suite_type: TestSuiteType, config: HashMap<String, String>) -> TestSuiteSpec {
         TestSuiteSpec {
             name,
             suite_type,
-            cred
+            config
         }
     }
 }
@@ -159,6 +160,39 @@ impl TestSuite {
         Ok(test_assertion_response_check_vec)
     }
 
+    fn retrieve_suite_config (yaml: &Yaml) -> Option<HashMap<String, String>> {
+        let config = yaml["suite-spec"]["config"].as_vec();
+
+        let mut config_map: HashMap<String, String> = HashMap::new();
+
+        if let Some(_config) = config {
+            for _iter in _config {
+                
+                let config_item = _iter.as_hash()?;
+                for (k, v) in config_item {
+                    let key = k.as_str();
+                    let val = v.as_str();
+    
+                    if let Some(_key) = key {
+                        if let Some(_val) = val {
+                            config_map.insert(
+                                _key.to_owned(),
+                                _val.to_owned()
+                            );                
+                        }
+                    }                    
+
+                }
+            }
+        }
+
+        if config_map.len() > 0 {
+            Some(config_map)
+        } else {
+            None
+        }
+    }
+
     pub fn from_yaml(yaml: &Yaml) -> Result<TestSuite> {
 
         let name: Option<&str> = yaml["suite-spec"]["name"].as_str();
@@ -174,10 +208,11 @@ impl TestSuite {
             None => return Err(yaml_error(String::from("Suite type not specified")))
         };
 
-        let cred: Option<&str> = yaml["suite-spec"]["cred"].as_str();
-        if let None = cred {
-            return Err(yaml_error(format!("Suite credentials not specified")));
+        let suite_config = TestSuite::retrieve_suite_config(yaml);
+        if let None = suite_config {
+            return Err(yaml_error(format!("Suite config not specified")));
         }
+        let suite_config = suite_config.unwrap();
             
         let tests = yaml["tests"].as_vec();
         if let None = tests {
@@ -263,7 +298,7 @@ impl TestSuite {
         Ok(
             TestSuite {
                 // we can safely unwrap now, None value is not possible here
-                suite_spec: TestSuiteSpec::new(name.unwrap().to_string(), suite_type.unwrap(), cred.unwrap().to_string()),
+                suite_spec: TestSuiteSpec::new(name.unwrap().to_string(), suite_type.unwrap(), suite_config),
                 tests: suite_tests
         }) 
     }
@@ -297,7 +332,13 @@ mod tests {
         let mut test1 = Test::new("Test1".to_string(), None);
         test1.assertions = vec![assertion1, assertion2];
         
-        let suite_spec = TestSuiteSpec::new("Express Tracking".to_string(), TestSuiteType::DialogFlow, "/path/to/cred".to_string());
+        let mut config_map = HashMap::new();
+        config_map.insert(
+            "credentials_file".to_string(),
+            "/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json".to_string()
+        );
+
+        let suite_spec = TestSuiteSpec::new("Express Tracking".to_string(), TestSuiteType::DialogFlow, config_map);
 
         let suite = TestSuite::new(suite_spec, vec![test1]);
 
@@ -320,7 +361,8 @@ mod tests {
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
-            cred: '/path/to/cred'
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: 'Welcome intent test'
               desc: 'Tests default welcome intent'
@@ -364,7 +406,8 @@ mod tests {
         r#"
         suite-spec:
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         "#;                    
 
         let docs = YamlLoader::load_from_str(YAML)?;
@@ -388,7 +431,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "SomeNonsense"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         "#;                    
 
         let docs = YamlLoader::load_from_str(YAML)?;
@@ -412,7 +456,8 @@ mod tests {
         r#"
         suite-spec:
             name: "Express Tracking"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         "#;                    
 
         let docs = YamlLoader::load_from_str(YAML)?;
@@ -430,7 +475,7 @@ mod tests {
     }    
 
     #[test]
-    fn test_parse_failed_credentials_not_specified () -> Result<()> {
+    fn test_parse_failed_suite_config_not_specified () -> Result<()> {
 
         const YAML: &str =
         r#"
@@ -446,7 +491,7 @@ mod tests {
 
         match result {
             Err(e) => {
-                assert_eq!(unwrap_yaml_parsing_error(e), "Suite credentials not specified".to_owned());
+                assert_eq!(unwrap_yaml_parsing_error(e), "Suite config not specified".to_owned());
             },
             _ => {panic!("error was supposed to be thrown!")}
         }
@@ -461,7 +506,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         "#;                    
 
         let docs = YamlLoader::load_from_str(YAML)?;
@@ -486,7 +532,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
         "#;                    
 
@@ -512,7 +559,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - desc: 'Tests default welcome intent'
               assertions:
@@ -549,7 +597,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: "Welcome intent test"
               desc: "Tests default welcome intent"
@@ -584,7 +633,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: "Welcome intent test"
               desc: "Tests default welcome intent"
@@ -620,7 +670,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: "Welcome intent test"
               desc: "Tests default welcome intent"
@@ -658,7 +709,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: "Welcome intent test"
               desc: "Tests default welcome intent"
@@ -695,7 +747,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: "Welcome intent test"
               desc: "Tests default welcome intent"
@@ -733,7 +786,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: "Welcome intent test"
               desc: "Tests default welcome intent"
@@ -771,7 +825,8 @@ mod tests {
         suite-spec:
             name: "Express Tracking"
             type: "DialogFlow"
-            cred: "/path/to/cred"
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: "Welcome intent test"
               desc: "Tests default welcome intent"
@@ -809,7 +864,8 @@ mod tests {
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
-            cred: '/path/to/cred'
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: 'Welcome intent test'
               desc: 'Tests default welcome intent'
@@ -910,7 +966,8 @@ mod tests {
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
-            cred: '/path/to/cred'
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: 'Default fallback intent'
               desc: 'Tests default fallback intent'
@@ -942,7 +999,8 @@ mod tests {
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
-            cred: '/path/to/cred'
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: 'Default fallback intent'
               desc: 'Tests default fallback intent'
@@ -974,7 +1032,8 @@ mod tests {
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
-            cred: '/path/to/cred'
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: 'Default fallback intent'
               desc: 'Tests default fallback intent'
@@ -1006,7 +1065,8 @@ mod tests {
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
-            cred: '/path/to/cred'
+            config: 
+              - credentials_file: '/path/to/cred'
         tests:
             - name: 'Default fallback intent'
               desc: 'Tests default fallback intent'

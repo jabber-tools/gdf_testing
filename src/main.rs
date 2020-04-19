@@ -11,7 +11,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     suite-spec:
         name: 'Express Tracking'
         type: 'DialogFlow'
-        cred: '/path/to/cred'
+        config: 
+              - credentials_file: '/path/to/cred'
     tests:
         - name: 'Welcome intent test'
           desc: 'Tests default welcome intent'

@@ -102,7 +102,7 @@ mod tests {
     
     // cargo test -- --show-output test_process_test
     #[test]
-    #[ignore]
+    // #[ignore]
     fn test_process_test() -> Result<()> {
 
         const YAML_STR: &str =
@@ -110,7 +110,8 @@ mod tests {
         suite-spec:
             name: 'Express Tracking'
             type: 'DialogFlow'
-            cred: 'DEPRECATED - WILL BE REMOVED AND REPLACED BY GENERIC KEY/VAL STRUCTURE!'
+            config: 
+              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json'
         tests:
             - name: 'Hello - track'
               desc: 'Simple initial two turn tracking dialog'
@@ -129,13 +130,7 @@ mod tests {
         let yaml: &Yaml = &docs[0];
         let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
     
-        let mut config_map = HashMap::new();
-        config_map.insert(
-            "credentials_file".to_string(),
-            "/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json".to_string()
-        );
-
-        let mut suite_executor = TestSuiteExecutor::new(&suite, config_map)?;
+        let mut suite_executor = TestSuiteExecutor::new(&suite)?;
         let test1_executor = &mut suite_executor.test_executors[0];
 
         while true {

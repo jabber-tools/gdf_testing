@@ -91,25 +91,24 @@ pub trait TestExecutor {
 
 pub struct TestSuiteExecutor<'a> {
     test_suite: &'a TestSuite,
-    config: HashMap<String, String>,
     pub test_executors: Vec<Box<dyn TestExecutor + 'a>>, // Box references are by default 'static! we must ecplivitly indicate shorter lifetime
 }
 
 impl<'a> TestSuiteExecutor<'a> {
-    fn new(test_suite: &'a TestSuite, config: HashMap<String, String>) -> Result<Self> {
+    fn new(test_suite: &'a TestSuite) -> Result<Self> {
         
         let mut test_executors:Vec<Box<dyn TestExecutor>> = vec![];
 
         match test_suite.suite_spec.suite_type {
             TestSuiteType::DHLVAP => {
 
-                let access_token = config.get("access_token");
+                let access_token = test_suite.suite_spec.config.get("access_token");
                 if let None = access_token {
                     return Err(new_error_from(ErrorKind::GenericError("access_token config value not found".to_owned())));            
                 }
                 let access_token = access_token.unwrap();
 
-                let vap_url = config.get("vap_url");
+                let vap_url = test_suite.suite_spec.config.get("vap_url");
                 if let None = vap_url {
                     return Err(new_error_from(ErrorKind::GenericError("vap_url config value not found".to_owned())));            
                 }
@@ -122,13 +121,12 @@ impl<'a> TestSuiteExecutor<'a> {
 
                 Ok(TestSuiteExecutor {
                     test_suite,
-                    config,
                     test_executors
                 })
             },
             TestSuiteType::DialogFlow => {
 
-                let credentials_file = config.get("credentials_file");
+                let credentials_file = test_suite.suite_spec.config.get("credentials_file");
                 if let None = credentials_file {
                     return Err(new_error_from(ErrorKind::GenericError("credentials_file config value not found".to_owned())));            
                 }
@@ -141,7 +139,6 @@ impl<'a> TestSuiteExecutor<'a> {
 
                 Ok(TestSuiteExecutor {
                     test_suite,
-                    config,
                     test_executors
                 })
             },
