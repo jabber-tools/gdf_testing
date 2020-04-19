@@ -102,13 +102,13 @@ mod tests {
     
     // cargo test -- --show-output test_process_test
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_process_test() -> Result<()> {
 
         const YAML_STR: &str =
         "
         suite-spec:
-            name: 'Express Tracking'
+            name: 'Dummy Tracking'
             type: 'DialogFlow'
             config: 
               - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json'

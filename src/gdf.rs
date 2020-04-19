@@ -198,8 +198,10 @@ mod tests {
     }
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_dialogflow_call() -> Result<()> {
+        // TBD: does not work behind corporate proxy
+        // add proxy setting for DialogFlow call
         let client = reqwest::blocking::Client::new();
 
         let cred = file_to_gdf_credentials("./src/testdata/credentials.json")?;

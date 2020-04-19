@@ -102,11 +102,11 @@ impl<'a> TestSuiteExecutor<'a> {
         match test_suite.suite_spec.suite_type {
             TestSuiteType::DHLVAP => {
 
-                let access_token = test_suite.suite_spec.config.get("access_token");
-                if let None = access_token {
-                    return Err(new_error_from(ErrorKind::GenericError("access_token config value not found".to_owned())));            
+                let vap_access_token = test_suite.suite_spec.config.get("vap_access_token");
+                if let None = vap_access_token {
+                    return Err(new_error_from(ErrorKind::GenericError("vap_access_token config value not found".to_owned())));            
                 }
-                let access_token = access_token.unwrap();
+                let vap_access_token = vap_access_token.unwrap();
 
                 let vap_url = test_suite.suite_spec.config.get("vap_url");
                 if let None = vap_url {
@@ -114,8 +114,27 @@ impl<'a> TestSuiteExecutor<'a> {
                 }
                 let vap_url = vap_url.unwrap();
 
+                let vap_svc_account_email = test_suite.suite_spec.config.get("vap_svc_account_email");
+                if let None = vap_svc_account_email {
+                    return Err(new_error_from(ErrorKind::GenericError("vap_svc_account_email config value not found".to_owned())));            
+                }
+                let vap_svc_account_email = vap_svc_account_email.unwrap();
+
+                let vap_svc_account_password = test_suite.suite_spec.config.get("vap_svc_account_password");
+                if let None = vap_svc_account_password {
+                    return Err(new_error_from(ErrorKind::GenericError("vap_svc_account_password config value not found".to_owned())));            
+                }
+                let vap_svc_account_password = vap_svc_account_password.unwrap();
+
+
                 for test in test_suite.tests.iter() {
-                    let _executor = Box::new(VAPTestExecutor::new(access_token.to_owned(), vap_url.to_owned(), test, test_suite)?) as Box<dyn TestExecutor>;
+                    let _executor = Box::new(VAPTestExecutor::new(
+                        vap_access_token.to_owned(),
+                        vap_url.to_owned(),
+                        vap_svc_account_email.to_owned(),
+                        vap_svc_account_password.to_owned(),
+                        test, 
+                        test_suite)?) as Box<dyn TestExecutor>;
                     test_executors.push(_executor);
                 }
 
