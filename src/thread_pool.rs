@@ -1,0 +1,112 @@
+use std::thread;
+use std::sync::mpsc;
+use std::sync::Arc;
+use std::sync::Mutex;
+
+// job is closure that borrows its environment mutably -> FnMut
+// jobs must be sendable to other thread -> Send
+// Job may outlive any scope within which it is defined -> static lifetime
+type Job = Box<dyn FnMut() + Send + 'static>;
+
+// workers will receive two kinds of messages:
+// 1 - new job to process
+// 2 - terminate signal
+enum Message {
+    NewJob(Job),
+    Terminate,
+}
+
+// thread pool is just vector of workers and
+// sending part of channel to propagate the tasks
+// to downstream workers
+pub struct ThreadPool {
+    workers: Vec<Worker>,
+    sender: mpsc::Sender<Message>,
+}
+
+impl ThreadPool {
+    pub fn new(size: usize) -> ThreadPool {
+        assert!(size > 0);
+
+        let (sender, receiver) = mpsc::channel();
+
+        // only one worker can receive the task from channel receiver at any given time -> Mutex
+        // in order to propagate Mutex to all worker threada we must wrap it in thread safe reference counter -> Arc
+        let receiver = Arc::new(Mutex::new(receiver));
+
+        let mut workers = Vec::with_capacity(size);
+
+        for id in 0..size {
+            workers.push(Worker::new(id, Arc::clone(&receiver)));
+        }
+
+        ThreadPool {
+            workers,
+            sender
+        }
+    }
+
+    // this method will be called for every test (respective closure)
+    pub fn execute<F>(&self, f: F)
+        where
+            F: FnMut() + Send + 'static
+    {
+        let job = Box::new(f);
+        self.sender.send(Message::NewJob(job)).unwrap();
+    }        
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        println!("Sending terminate message to all workers.");
+
+        // ask to workers to terminate ...
+        for _ in &mut self.workers {
+            self.sender.send(Message::Terminate).unwrap();
+        }
+
+        println!("Shutting down all workers.");
+
+        for worker in &mut self.workers {
+            println!("Shutting down worker {}", worker.id);
+
+            // ... wait until the really do so!
+            if let Some(thread) = worker.thread.take() /* takes the value out of the option, leaving a None in its place. */ {
+                thread.join().unwrap();
+            }
+        }
+    }
+}
+
+struct Worker {
+    id: usize,
+    thread: Option<thread::JoinHandle<()>>, // handle to thread that can be joined
+}
+
+impl Worker {
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
+        let thread = thread::spawn(move || {
+            loop {
+                // receive mutex lock: lock()
+                // receive message from channel once available: recv()
+                let message = receiver.lock().unwrap().recv().unwrap();
+
+                match message {
+                    Message::NewJob(mut job) => {
+                        println!("Worker {} got a job; executing.", id);
+                        job(); //this will do the job, i.e. execute dialog test
+                    },
+                    Message::Terminate => {
+                        println!("Worker {} was told to terminate.", id);
+                        break; // break the worker loop once asked to do so
+                    },
+                }
+            } // end loop
+        });
+
+        Worker {
+            id,
+            thread: Some(thread),
+        }
+    }
+}

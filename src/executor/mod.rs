@@ -91,13 +91,13 @@ pub trait TestExecutor {
 
 pub struct TestSuiteExecutor<'a> {
     test_suite: &'a TestSuite,
-    pub test_executors: Vec<Box<dyn TestExecutor + 'a>>, // Box references are by default 'static! we must ecplivitly indicate shorter lifetime
+    pub test_executors: Vec<Box<dyn TestExecutor + 'a + Send>>, // Box references are by default 'static! we must ecplivitly indicate shorter lifetime
 }
 
 impl<'a> TestSuiteExecutor<'a> {
-    fn new(test_suite: &'a TestSuite) -> Result<Self> {
+    pub fn new(test_suite: &'a TestSuite) -> Result<Self> {
         
-        let mut test_executors:Vec<Box<dyn TestExecutor>> = vec![];
+        let mut test_executors:Vec<Box<dyn TestExecutor + Send>> = vec![];
 
         match test_suite.suite_spec.suite_type {
             TestSuiteType::DHLVAP => {
@@ -134,7 +134,7 @@ impl<'a> TestSuiteExecutor<'a> {
                         vap_svc_account_email.to_owned(),
                         vap_svc_account_password.to_owned(),
                         test, 
-                        test_suite)?) as Box<dyn TestExecutor>;
+                        test_suite)?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
@@ -152,7 +152,7 @@ impl<'a> TestSuiteExecutor<'a> {
                 let credentials_file = credentials_file.unwrap();
         
                 for test in test_suite.tests.iter() {
-                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), test, test_suite)?) as Box<dyn TestExecutor>;
+                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), test, test_suite)?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
