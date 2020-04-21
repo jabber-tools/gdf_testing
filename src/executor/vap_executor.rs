@@ -66,21 +66,21 @@ fn call_vap (payload: String, conv_id: &str, http_client: &HttpClient, bearer: &
     Ok(resp)
 }
 
-pub struct VAPTestExecutor<'a> {
+pub struct VAPTestExecutor {
     vap_access_token: String,
     vap_url: String,
     vap_svc_account_email: String,
     vap_svc_account_password: String,
-    test: &'a Test,
-    parent_suite: &'a TestSuite,
+    test_idx: usize,
+    parent_suite: TestSuite,
     http_client: HttpClient,
     next_assertion: usize,
     conv_id: String,
     jwt_token: String
 }
 
-impl<'a> VAPTestExecutor<'a> {
-    pub fn new(vap_access_token: String, vap_url: String, vap_svc_account_email: String, vap_svc_account_password: String, test: &'a Test, parent_suite: &'a TestSuite) -> Result<Self> {
+impl VAPTestExecutor {
+    pub fn new(vap_access_token: String, vap_url: String, vap_svc_account_email: String, vap_svc_account_password: String, test_idx: usize, parent_suite: TestSuite) -> Result<Self> {
 
         let http_client = HttpClient::new();
         let conv_id = GUID::rand().to_string();
@@ -92,7 +92,7 @@ impl<'a> VAPTestExecutor<'a> {
             vap_url,
             vap_svc_account_email,
             vap_svc_account_password,
-            test,
+            test_idx,
             parent_suite,
             http_client,
             next_assertion: 0,
@@ -140,14 +140,14 @@ impl<'a> VAPTestExecutor<'a> {
     }
 }
 
-impl<'a> TestExecutor for VAPTestExecutor<'a> {
+impl TestExecutor for VAPTestExecutor {
     
     fn move_to_next_assertion(&mut self) {
         self.next_assertion = self.next_assertion + 1;
     }
 
     fn get_assertions(&self) -> &Vec<TestAssertion> {
-        &self.test.assertions
+        &self.parent_suite.tests[self.test_idx].assertions
     }
 
     fn get_next_assertion_no(&self) -> usize {
@@ -236,8 +236,8 @@ mod tests {
         suite.suite_spec.config.get("vap_url").unwrap().to_owned(),
         suite.suite_spec.config.get("vap_svc_account_email").unwrap().to_owned(),
         suite.suite_spec.config.get("vap_svc_account_password").unwrap().to_owned(),
-        &suite.tests[0], 
-        &suite).unwrap();
+        0, 
+        suite.clone()).unwrap();
         
         assert_eq!(executor.jwt_token.trim().len() > 0, true);
 
@@ -266,7 +266,7 @@ mod tests {
         let yaml: &Yaml = &docs[0];
         let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
     
-        let mut suite_executor = TestSuiteExecutor::new(&suite)?;
+        let mut suite_executor = TestSuiteExecutor::new(suite)?;
         let test1_executor = &mut suite_executor.test_executors[0];
 
         while true {

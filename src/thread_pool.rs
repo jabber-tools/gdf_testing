@@ -3,10 +3,10 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-// job is closure that borrows its environment mutably -> FnMut
+// job is closure that consumes its environment -> FnOnce
 // jobs must be sendable to other thread -> Send
 // Job may outlive any scope within which it is defined -> static lifetime
-type Job = Box<dyn FnMut() + Send + 'static>;
+type Job = Box<dyn FnOnce() + Send + 'static>;
 
 // workers will receive two kinds of messages:
 // 1 - new job to process
@@ -49,7 +49,7 @@ impl ThreadPool {
     // this method will be called for every test (respective closure)
     pub fn execute<F>(&self, f: F)
         where
-            F: FnMut() + Send + 'static
+            F: FnOnce() + Send + 'static
     {
         let job = Box::new(f);
         self.sender.send(Message::NewJob(job)).unwrap();

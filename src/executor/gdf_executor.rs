@@ -30,9 +30,9 @@ use crate::executor::{TestExecutor, TestSuiteExecutor};
 
 pub type HttpClient = reqwest::blocking::Client;
 
-pub struct GDFDefaultTestExecutor<'a> {
-    test: &'a Test,
-    parent_suite: &'a TestSuite,
+pub struct GDFDefaultTestExecutor {
+    test_idx: usize,
+    parent_suite: TestSuite,
     next_assertion: usize,
     http_client: HttpClient,
     token: GoogleApisOauthToken,
@@ -40,8 +40,8 @@ pub struct GDFDefaultTestExecutor<'a> {
     cred: GDFCredentials,
 }
 
-impl<'a> GDFDefaultTestExecutor<'a> {
-    pub fn new(credentials_file: String, test: &'a Test, parent_suite: &'a TestSuite) -> Result<Self> {
+impl GDFDefaultTestExecutor {
+    pub fn new(credentials_file: String, test_idx: usize, parent_suite: TestSuite) -> Result<Self> {
 
         let http_client = HttpClient::new();
         let token = get_google_api_token(&credentials_file, &http_client)?;
@@ -49,7 +49,7 @@ impl<'a> GDFDefaultTestExecutor<'a> {
         let cred = file_to_gdf_credentials(&credentials_file)?;
 
         Ok(GDFDefaultTestExecutor {
-            test,
+            test_idx,
             parent_suite,
             next_assertion: 0,
             http_client: http_client,
@@ -60,14 +60,14 @@ impl<'a> GDFDefaultTestExecutor<'a> {
     }
 }
 
-impl<'a> TestExecutor for GDFDefaultTestExecutor<'a> {
+impl TestExecutor for GDFDefaultTestExecutor {
 
     fn move_to_next_assertion(&mut self) {
         self.next_assertion = self.next_assertion + 1;
     }
 
     fn get_assertions(&self) -> &Vec<TestAssertion> {
-        &self.test.assertions
+        &self.parent_suite.tests[self.test_idx].assertions
     }
 
     fn get_next_assertion_no(&self) -> usize {
@@ -130,7 +130,7 @@ mod tests {
         let yaml: &Yaml = &docs[0];
         let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
     
-        let mut suite_executor = TestSuiteExecutor::new(&suite)?;
+        let mut suite_executor = TestSuiteExecutor::new(suite)?;
         let test1_executor = &mut suite_executor.test_executors[0];
 
         while true {
@@ -165,7 +165,7 @@ mod tests {
     
     // cargo test -- --show-output test_process_multiple_tests
     #[test]
-    #[ignore]
+     #[ignore]
     fn test_process_multiple_tests() -> Result<()> {
 
         const YAML_STR: &str =
@@ -207,12 +207,12 @@ mod tests {
         let yaml: &Yaml = &docs[0];
         let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
     
-        let mut suite_executor = TestSuiteExecutor::new(&suite)?;
+        let mut suite_executor = TestSuiteExecutor::new(suite)?;
 
         let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
 
-        /*for test_executor in &mut suite_executor.test_executors {
-            pool.execute(|| {
+        for mut test_executor in suite_executor.test_executors {
+            pool.execute(move || {
         
                 while true {
                     println!();
@@ -241,8 +241,7 @@ mod tests {
                 }             
                 
             });
-        }*/
-
+        }
 
         Ok(())
     }         

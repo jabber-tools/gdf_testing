@@ -90,14 +90,14 @@ pub trait TestExecutor {
 }
 
 pub struct TestSuiteExecutor<'a> {
-    test_suite: &'a TestSuite,
+    test_suite: TestSuite,
     pub test_executors: Vec<Box<dyn TestExecutor + 'a + Send>>, // Box references are by default 'static! we must ecplivitly indicate shorter lifetime
 }
 
 impl<'a> TestSuiteExecutor<'a> {
-    pub fn new(test_suite: &'a TestSuite) -> Result<Self> {
+    pub fn new(test_suite: TestSuite) -> Result<Self> {
         
-        let mut test_executors:Vec<Box<dyn TestExecutor + Send>> = vec![];
+        let mut test_executors:Vec<Box<dyn TestExecutor + 'a + Send>> = vec![];
 
         match test_suite.suite_spec.suite_type {
             TestSuiteType::DHLVAP => {
@@ -127,14 +127,14 @@ impl<'a> TestSuiteExecutor<'a> {
                 let vap_svc_account_password = vap_svc_account_password.unwrap();
 
 
-                for test in test_suite.tests.iter() {
+                for (idx, test) in test_suite.tests.iter().enumerate() {
                     let _executor = Box::new(VAPTestExecutor::new(
                         vap_access_token.to_owned(),
                         vap_url.to_owned(),
                         vap_svc_account_email.to_owned(),
                         vap_svc_account_password.to_owned(),
-                        test, 
-                        test_suite)?) as Box<dyn TestExecutor + Send>;
+                        idx, 
+                        test_suite.clone())?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
@@ -151,8 +151,8 @@ impl<'a> TestSuiteExecutor<'a> {
                 }
                 let credentials_file = credentials_file.unwrap();
         
-                for test in test_suite.tests.iter() {
-                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), test, test_suite)?) as Box<dyn TestExecutor + Send>;
+                for (idx, test) in test_suite.tests.iter().enumerate() {
+                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), idx, test_suite.clone())?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 

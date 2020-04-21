@@ -1,18 +1,7 @@
-// use gdf_testing;
-// use std::error::Error;
-// use yaml_rust::YamlLoader;
-use gdf_testing::errors::{Result, ErrorKind, Error};
+use gdf_testing::errors::{Result, ErrorKind};
 use yaml_rust::{YamlLoader, Yaml};
-use gdf_testing::executor::{TestExecutor, TestSuiteExecutor};
-use gdf_testing::yaml_parser::{
-  Test, 
-  TestAssertion, 
-  TestSuiteType, 
-  TestSuite, 
-  TestAssertionResponseCheckOperator,
-  TestAssertionResponseCheckValue,
-  TestAssertionResponseCheck
-};
+use gdf_testing::executor::TestSuiteExecutor;
+use gdf_testing::yaml_parser::TestSuite;
 use gdf_testing::thread_pool::ThreadPool;
 
 #[allow(unused_must_use)]
@@ -56,12 +45,12 @@ fn main() -> Result<()> {
   let yaml: &Yaml = &docs[0];
   let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
 
-  let mut suite_executor = TestSuiteExecutor::new(&suite)?;
+  let mut suite_executor = TestSuiteExecutor::new(suite)?;
 
   let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
 
-  /*for test_executor in &mut suite_executor.test_executors {
-      pool.execute(|| {
+  for mut test_executor in suite_executor.test_executors {
+      pool.execute(move || {
   
           while true {
               println!();
@@ -90,8 +79,8 @@ fn main() -> Result<()> {
           }             
           
       });
-  }*/
+  }
 
-
+  println!("terminating main with Ok(())");
   Ok(())
 }

@@ -2,7 +2,11 @@ use yaml_rust::Yaml;
 use crate::errors::{Result, ErrorKind, new_error_from, Error};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+fn yaml_error(message: String) -> Error {
+    new_error_from(ErrorKind::YamlParsingError(message))
+}  
+
+#[derive(Debug, Clone)]
 pub enum TestSuiteType {
     DialogFlow,
     DHLVAP
@@ -13,6 +17,16 @@ pub struct TestSuiteSpec {
     pub name: String,
     pub suite_type: TestSuiteType,
     pub config: HashMap<String, String>
+}
+
+impl Clone for TestSuiteSpec {
+    fn clone(&self) -> TestSuiteSpec {
+        TestSuiteSpec {
+            name: self.name.clone(),
+            suite_type: self.suite_type.clone(),
+            config: self.config.clone()
+        }
+    }
 }
 
 impl TestSuiteSpec {
@@ -32,6 +46,16 @@ pub struct TestAssertion {
     pub response_checks: Vec<TestAssertionResponseCheck>
 }
 
+impl Clone for TestAssertion {
+    fn clone(&self) -> TestAssertion {
+        TestAssertion {
+            user_says: self.user_says.clone(),
+            bot_responds_with: self.bot_responds_with.clone(),
+            response_checks: self.response_checks.clone()
+        }
+    }
+}
+
 impl TestAssertion {
     pub fn new(user_says: String, bot_responds_with: Vec<String>, response_checks: Vec<TestAssertionResponseCheck>) -> TestAssertion {
         TestAssertion {
@@ -42,7 +66,7 @@ impl TestAssertion {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TestAssertionResponseCheckOperator {
     Equals,
     NotEquals,
@@ -58,11 +82,33 @@ pub enum TestAssertionResponseCheckValue {
     BoolVal(bool),
 }
 
+impl Clone for TestAssertionResponseCheckValue {
+    fn clone(&self) -> TestAssertionResponseCheckValue {
+        
+        match self {
+            TestAssertionResponseCheckValue::BoolVal(bool_val) => TestAssertionResponseCheckValue::BoolVal(bool_val.clone()),
+            TestAssertionResponseCheckValue::StrVal(str_val) => TestAssertionResponseCheckValue::StrVal(str_val.clone()),
+            TestAssertionResponseCheckValue::NumVal(num_val) => TestAssertionResponseCheckValue::NumVal(num_val.clone())
+        }
+
+    }
+}
+
 #[derive(Debug)]
 pub struct TestAssertionResponseCheck {
     pub expression: String,
     pub operator: TestAssertionResponseCheckOperator,
     pub value: TestAssertionResponseCheckValue
+}
+
+impl Clone for TestAssertionResponseCheck {
+    fn clone(&self) -> TestAssertionResponseCheck {
+        TestAssertionResponseCheck {
+            expression: self.expression.clone(),
+            operator: self.operator.clone(),
+            value: self.value.clone()
+        }
+    }
 }
 
 impl TestAssertionResponseCheck {
@@ -81,6 +127,16 @@ pub struct Test {
     pub desc: Option<String>,
     pub assertions: Vec<TestAssertion>
 }
+
+impl Clone for Test {
+    fn clone(&self) -> Test {
+        Test {
+            name: self.name.clone(),
+            desc: self.desc.clone(),
+            assertions: self.assertions.clone()
+        }
+    }
+}
     
 impl Test {
     pub fn new(name: String, desc: Option<String>) -> Test {
@@ -98,9 +154,14 @@ pub struct TestSuite {
     pub tests: Vec<Test>
 }
 
-fn yaml_error(message: String) -> Error {
-    new_error_from(ErrorKind::YamlParsingError(message))
-}  
+impl Clone for TestSuite {
+    fn clone(&self) -> TestSuite {
+        TestSuite {
+            suite_spec: self.suite_spec.clone(),
+            tests: self.tests.clone()
+        }
+    }
+}
 
 impl TestSuite {
 
