@@ -43,7 +43,15 @@ impl TestSuiteSpec {
 pub struct TestAssertion {
     pub user_says: String,
     pub bot_responds_with: Vec<String>,
-    pub response_checks: Vec<TestAssertionResponseCheck>
+    pub response_checks: Vec<TestAssertionResponseCheck>,
+    pub test_assertion_result: Option<TestAssertionResult>,
+}
+
+#[derive(Debug)]
+pub enum TestAssertionResult {
+    Ok(String), // contains NLP provider response
+    KoIntentNameMismatch(Error), // error contains both error description and NLP provider response (see Error.backend_response)
+    KoResponseCheckError(Error)
 }
 
 impl Clone for TestAssertion {
@@ -51,7 +59,10 @@ impl Clone for TestAssertion {
         TestAssertion {
             user_says: self.user_says.clone(),
             bot_responds_with: self.bot_responds_with.clone(),
-            response_checks: self.response_checks.clone()
+            response_checks: self.response_checks.clone(),
+            // no need to clone, we are cloning TestAssertion (as part of Test) only when passing test suite executor (i.e. result is always None at this point)
+            // cloning test_assertion_result requires cloning Error and that is challenging since Error sources are different 3rd party errors which do not implement Clone trait
+            test_assertion_result: None
         }
     }
 }
@@ -61,7 +72,8 @@ impl TestAssertion {
         TestAssertion {
             user_says,
             bot_responds_with,
-            response_checks
+            response_checks,
+            test_assertion_result: None
         }
     }
 }
@@ -84,13 +96,11 @@ pub enum TestAssertionResponseCheckValue {
 
 impl Clone for TestAssertionResponseCheckValue {
     fn clone(&self) -> TestAssertionResponseCheckValue {
-        
         match self {
             TestAssertionResponseCheckValue::BoolVal(bool_val) => TestAssertionResponseCheckValue::BoolVal(bool_val.clone()),
             TestAssertionResponseCheckValue::StrVal(str_val) => TestAssertionResponseCheckValue::StrVal(str_val.clone()),
             TestAssertionResponseCheckValue::NumVal(num_val) => TestAssertionResponseCheckValue::NumVal(num_val.clone())
         }
-
     }
 }
 
@@ -121,11 +131,20 @@ impl TestAssertionResponseCheck {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum TestResult {
+    Ok,
+    Ko
+}
+
+
 #[derive(Debug)]
 pub struct Test {
     pub name: String,
     pub desc: Option<String>,
-    pub assertions: Vec<TestAssertion>
+    pub assertions: Vec<TestAssertion>,
+    pub execution_id: Option<usize>,
+    pub test_result: Option<TestResult>,
 }
 
 impl Clone for Test {
@@ -133,7 +152,9 @@ impl Clone for Test {
         Test {
             name: self.name.clone(),
             desc: self.desc.clone(),
-            assertions: self.assertions.clone()
+            assertions: self.assertions.clone(),
+            execution_id: self.execution_id.clone(),
+            test_result: self.test_result.clone()
         }
     }
 }
@@ -143,7 +164,9 @@ impl Test {
         Test {
             name: name,
             desc: desc,
-            assertions: vec![]
+            assertions: vec![],
+            execution_id: None,
+            test_result: None
         }
     }
 }

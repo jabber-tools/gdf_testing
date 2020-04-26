@@ -49,7 +49,7 @@ fn main() -> Result<()> {
 
   let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
 
-  for mut test_executor in suite_executor.test_executors {
+  /*for mut test_executor in suite_executor.test_executors {
       pool.execute(move || {
   
           while true {
@@ -79,7 +79,7 @@ fn main() -> Result<()> {
           }             
           
       });
-  }
+  }*/
 
   println!("terminating main with Ok(())");
   Ok(())

@@ -10,7 +10,9 @@ use crate::json_parser::{
 };
 use crate::yaml_parser::{
     Test, 
+    TestResult,
     TestAssertion, 
+    TestAssertionResult,
     TestSuiteType, 
     TestSuite, 
     TestAssertionResponseCheckOperator,
@@ -63,9 +65,22 @@ impl TestExecutor for GDFDefaultTestExecutor {
     fn move_to_next_assertion(&mut self) {
         self.next_assertion = self.next_assertion + 1;
     }
+    
+    fn move_behind_last_assertion(&mut self) {
+        self.next_assertion = self.get_assertions().len() + 1;
+    }
 
     fn get_assertions(&self) -> &Vec<TestAssertion> {
         &self.test.assertions
+    }
+
+    fn set_test_result(&mut self, test_result: TestResult) {
+        self.test.test_result = Some(test_result);
+    }
+
+    fn set_test_assertion_result(&mut self, test_assertion_result: TestAssertionResult) {
+        let idx = self.get_next_assertion_no();
+        self.test.assertions[idx].test_assertion_result = Some(test_assertion_result);
     }
 
     fn get_next_assertion_no(&self) -> usize {
@@ -122,6 +137,15 @@ mod tests {
                     - expression: 'queryResult.allRequiredParamsPresent'
                       operator: 'equals'
                       value: true
+                - userSays: 'it is 1234567891'
+                  botRespondsWith: ['Tracking|CS|3|ID valid|Gen']
+                  responseChecks:
+                    - expression: 'queryResult.action'
+                      operator: 'equals'
+                      value: 'express_track'
+                    - expression: 'queryResult.parameters.tracking_id'
+                      operator: 'equals'
+                      value: '1234567891'
        ";           
 
         let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
@@ -143,17 +167,13 @@ mod tests {
             let user_says = &details_result.unwrap().user_says;
 
             print!("Saying {}", user_says);
-            let assertion_result = test1_executor.execute_next_assertion().unwrap();
+            let assertion_exec_result = test1_executor.execute_next_assertion();
 
-            if let Err(err) =  assertion_result {
-                match *err.kind {
-                    ErrorKind::InvalidTestAssertionEvaluation => {
-                        print!(" - ko! {}", err.message);
-                    },
-                    _ =>  print!(" - ko! {}", err)
-                }
-            } else {
+            if let Some(_) =  assertion_exec_result {
                 print!(" - ok!");
+            } else {
+                print!(" - ko!");
+                break;
             }
         }        
 
@@ -163,7 +183,7 @@ mod tests {
     
     // cargo test -- --show-output test_process_multiple_tests
     #[test]
-    // #[ignore]
+    //#[ignore]
     fn test_process_multiple_tests() -> Result<()> {
 
         const YAML_STR: &str =
@@ -185,20 +205,26 @@ mod tests {
                     - expression: 'queryResult.allRequiredParamsPresent'
                       operator: 'equals'
                       value: true
-            - name: 'Hello - track - 2'
+            - name: 'Hello - track - entity parsing'
               desc: 'Very similar second test'
               assertions:
-                - userSays: 'Hello'
+                - userSays: 'Hi'
                   botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
-                - userSays: 'how do I change my address'
-                  botRespondsWith: ['FAQ|CS|0|Address change|TPh']
+                - userSays: 'track a package please'
+                  botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
                   responseChecks:
-                  - expression: 'queryResult.action'
-                    operator: 'equals'
-                    value: 'country_specific_response'
-                  - expression: 'queryResult.parameters.event'
-                    operator: 'equals'
-                    value: 'faq_address_change'
+                    - expression: 'queryResult.allRequiredParamsPresent'
+                      operator: 'equals'
+                      value: true
+                - userSays: 'it is 1234567891'
+                  botRespondsWith: ['Tracking|CS|3|ID valid|Gen']
+                  responseChecks:
+                    - expression: 'queryResult.action'
+                      operator: 'equals'
+                      value: 'express_track'
+                    - expression: 'queryResult.parameters.tracking_id'
+                      operator: 'equals'
+                      value: '1234567891'
        ";           
 
         let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
@@ -214,35 +240,17 @@ mod tests {
         
                 while true {
                     println!();
-                    let details_result = test_executor.next_assertion_details();
-        
-                    if let None = details_result {
-                        println!("all assertions processed!");
-                        break; // all asertions were processed -> break
-                    }
-        
-                    let user_says = &details_result.unwrap().user_says;
-        
-                    print!("Saying {}", user_says);
-                    let assertion_result = test_executor.execute_next_assertion().unwrap();
-        
-                    if let Err(err) =  assertion_result {
-                        match *err.kind {
-                            ErrorKind::InvalidTestAssertionEvaluation => {
-                                print!(" - ko! {}", err.message);
-                            },
-                            _ =>  print!(" - ko! {}", err)
-                        }
-                    } else {
-                        print!(" - ok!");
+                    let assertion_exec_result = test_executor.execute_next_assertion();
+                    if let None =  assertion_exec_result {
+                        break;
                     }
                 }             
-                
+                println!("pool.execute closure done");
             });
         }
-
+        println!("workers initiated!");
         Ok(())
-    }         
+    }       
 
 }
     

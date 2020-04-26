@@ -5,7 +5,9 @@ use guid_create::GUID;
 
 use crate::yaml_parser::{
     Test, 
+    TestResult,
     TestAssertion, 
+    TestAssertionResult,
     TestSuiteType, 
     TestSuite, 
     TestAssertionResponseCheckOperator,
@@ -144,8 +146,21 @@ impl TestExecutor for VAPTestExecutor {
         self.next_assertion = self.next_assertion + 1;
     }
 
+    fn move_behind_last_assertion(&mut self) {
+        self.next_assertion = self.get_assertions().len() + 1;
+    }
+
     fn get_assertions(&self) -> &Vec<TestAssertion> {
         &self.test.assertions
+    }
+
+    fn set_test_result(&mut self, test_result: TestResult) {
+        self.test.test_result = Some(test_result);
+    }
+
+    fn set_test_assertion_result(&mut self, test_assertion_result: TestAssertionResult) {
+        let idx = self.get_next_assertion_no();
+        self.test.assertions[idx].test_assertion_result = Some(test_assertion_result);
     }
 
     fn get_next_assertion_no(&self) -> usize {
@@ -204,7 +219,6 @@ mod tests {
                   operator: 'equals'
                   value: 'vap-generic'
    ";      
-
     
     #[test]
     fn test_get_vap_config() {
@@ -278,20 +292,16 @@ mod tests {
             let user_says = &details_result.unwrap().user_says;
 
             print!("Saying {}", user_says);
-            let assertion_result = test1_executor.execute_next_assertion().unwrap();
+            let assertion_exec_result = test1_executor.execute_next_assertion();
 
-            if let Err(err) =  assertion_result {
-                match *err.kind {
-                    ErrorKind::InvalidTestAssertionEvaluation => {
-                        print!(" - ko! {}", err.message);
-                    },
-                    _ =>  print!(" - ko! {}", err)
-                }
-            } else {
+            if let Some(_) =  assertion_exec_result {
                 print!(" - ok!");
+            } else {
+                print!(" - ko!");
+                break;
             }
         }        
 
         Ok(())
-    }        
+    }    
 }

@@ -10,7 +10,9 @@ use crate::json_parser::{
 };
 use crate::yaml_parser::{
     Test, 
+    TestResult,
     TestAssertion, 
+    TestAssertionResult,
     TestSuiteType, 
     TestSuite, 
     TestAssertionResponseCheckOperator,
@@ -32,7 +34,10 @@ use crate::executor::gdf_executor::GDFDefaultTestExecutor;
 pub trait TestExecutor {
     // helper abstaract methods so that we can use default implementations for next_assertion_details/execute_next_assertion
     fn move_to_next_assertion(&mut self);
+    fn move_behind_last_assertion(&mut self);
     fn get_assertions(&self) -> &Vec<TestAssertion>;
+    fn set_test_result(&mut self, test_result: TestResult);
+    fn set_test_assertion_result(&mut self, test_assertion_result: TestAssertionResult);
     fn get_next_assertion_no(&self) -> usize;
     //
     // core abstract method to be provided for every test executor //
@@ -52,7 +57,8 @@ pub trait TestExecutor {
             Some(assertion_to_execute)
         }
     }
-    fn execute_next_assertion(&mut self) -> Option<Result<String>> {
+
+    fn execute_next_assertion(&mut self) -> Option<()> {
 
         let next_assertion_no = self.get_next_assertion_no();
         let assertions = self.get_assertions();
@@ -67,26 +73,31 @@ pub trait TestExecutor {
 
             if let Err(intent_mismatch_error) = assertion_response {
                 // if intent name does not match expected value do not continue
-                self.move_to_next_assertion();
-                return Some(Err(intent_mismatch_error));
-            }
+                self.set_test_assertion_result(TestAssertionResult::KoIntentNameMismatch(intent_mismatch_error));
+                self.set_test_result(TestResult::Ko);
+                self.move_behind_last_assertion();
+                return None;
+            } 
 
             // otherwise try to run assertion response checks
             let assertion_response = assertion_response.unwrap();
 
             for response_check in &assertion_to_execute.response_checks {
                 let response_check_result = TestSuiteExecutor::process_assertion_response_check(response_check, &assertion_response);
-
+    
                 if let Err(some_response_check_error) = response_check_result {
-                    self.move_to_next_assertion();
-                    return Some(Err(some_response_check_error));
+                    self.set_test_assertion_result(TestAssertionResult::KoResponseCheckError(some_response_check_error));
+                    self.set_test_result(TestResult::Ko);
+                    self.move_behind_last_assertion();
+                    return None;
                 }
             } 
-            
+                
             self.move_to_next_assertion();
-            return Some(Ok(assertion_response));
-        };
-    }    
+            return Some(());                
+
+        }
+    }      
 }
 
 pub struct TestSuiteExecutor<'a> {
@@ -128,12 +139,15 @@ impl<'a> TestSuiteExecutor<'a> {
 
 
                 for (idx, test) in test_suite.tests.iter().enumerate() {
+                    let mut _test = test.clone();
+                    _test.execution_id = Some(idx);
+
                     let _executor = Box::new(VAPTestExecutor::new(
                         vap_access_token.to_owned(),
                         vap_url.to_owned(),
                         vap_svc_account_email.to_owned(),
                         vap_svc_account_password.to_owned(),
-                        test.clone())?) as Box<dyn TestExecutor + Send>;
+                        _test)?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
@@ -151,7 +165,9 @@ impl<'a> TestSuiteExecutor<'a> {
                 let credentials_file = credentials_file.unwrap();
         
                 for (idx, test) in test_suite.tests.iter().enumerate() {
-                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), test.clone())?) as Box<dyn TestExecutor + Send>;
+                    let mut _test = test.clone();
+                    _test.execution_id = Some(idx);
+                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), _test)?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
