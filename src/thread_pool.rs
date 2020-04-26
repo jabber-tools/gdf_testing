@@ -92,7 +92,7 @@ impl Worker {
                 let message = receiver.lock().unwrap().recv().unwrap();
 
                 match message {
-                    Message::NewJob(mut job) => {
+                    Message::NewJob(job) => {
                         println!("Worker {} got a job; executing.", id);
                         job(); //this will do the job, i.e. execute dialog test
                     },

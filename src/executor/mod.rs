@@ -2,6 +2,7 @@ use reqwest;
 use guid_create::GUID;
 use std::collections::HashMap;
 use yaml_rust::{YamlLoader, Yaml};
+use std::sync::mpsc;
 
 use crate::errors::{Result, ErrorKind, new_service_call_error, new_error, new_error_from, Error};
 use crate::json_parser::{
@@ -39,6 +40,7 @@ pub trait TestExecutor {
     fn set_test_result(&mut self, test_result: TestResult);
     fn set_test_assertion_result(&mut self, test_assertion_result: TestAssertionResult);
     fn get_next_assertion_no(&self) -> usize;
+    fn send_test_results(&self);
     //
     // core abstract method to be provided for every test executor //
     //
@@ -51,6 +53,7 @@ pub trait TestExecutor {
         let assertions = self.get_assertions();
 
         if next_assertion_no >= assertions.len() {
+            self.send_test_results();
             None
         } else {
             let assertion_to_execute = &assertions[next_assertion_no];
@@ -64,7 +67,8 @@ pub trait TestExecutor {
         let assertions = self.get_assertions();
 
         if next_assertion_no >= assertions.len() {
-            self.move_to_next_assertion();
+            self.set_test_result(TestResult::Ok);
+            self.send_test_results();
             return None;
         } else {
             let assertion_to_execute = &assertions[next_assertion_no];
@@ -76,6 +80,7 @@ pub trait TestExecutor {
                 self.set_test_assertion_result(TestAssertionResult::KoIntentNameMismatch(intent_mismatch_error));
                 self.set_test_result(TestResult::Ko);
                 self.move_behind_last_assertion();
+                self.send_test_results();
                 return None;
             } 
 
@@ -89,10 +94,12 @@ pub trait TestExecutor {
                     self.set_test_assertion_result(TestAssertionResult::KoResponseCheckError(some_response_check_error));
                     self.set_test_result(TestResult::Ko);
                     self.move_behind_last_assertion();
+                    self.send_test_results();
                     return None;
                 }
             } 
-                
+            
+            self.set_test_assertion_result(TestAssertionResult::Ok(assertion_response));
             self.move_to_next_assertion();
             return Some(());                
 
@@ -103,11 +110,14 @@ pub trait TestExecutor {
 pub struct TestSuiteExecutor<'a> {
     test_suite: TestSuite,
     pub test_executors: Vec<Box<dyn TestExecutor + 'a + Send>>, // Box references are by default 'static! we must ecplivitly indicate shorter lifetime
+    pub rx: mpsc::Receiver<Test>
 }
 
 impl<'a> TestSuiteExecutor<'a> {
     pub fn new(test_suite: TestSuite) -> Result<Self> {
         
+        let (tx, rx) = mpsc::channel(); // channel for receoving the results of tests which are running in parallel
+
         let mut test_executors:Vec<Box<dyn TestExecutor + 'a + Send>> = vec![];
 
         match test_suite.suite_spec.suite_type {
@@ -137,7 +147,6 @@ impl<'a> TestSuiteExecutor<'a> {
                 }
                 let vap_svc_account_password = vap_svc_account_password.unwrap();
 
-
                 for (idx, test) in test_suite.tests.iter().enumerate() {
                     let mut _test = test.clone();
                     _test.execution_id = Some(idx);
@@ -147,13 +156,14 @@ impl<'a> TestSuiteExecutor<'a> {
                         vap_url.to_owned(),
                         vap_svc_account_email.to_owned(),
                         vap_svc_account_password.to_owned(),
-                        _test)?) as Box<dyn TestExecutor + Send>;
+                        _test, tx.clone())?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
                 Ok(TestSuiteExecutor {
                     test_suite,
-                    test_executors
+                    test_executors,
+                    rx
                 })
             },
             TestSuiteType::DialogFlow => {
@@ -167,13 +177,14 @@ impl<'a> TestSuiteExecutor<'a> {
                 for (idx, test) in test_suite.tests.iter().enumerate() {
                     let mut _test = test.clone();
                     _test.execution_id = Some(idx);
-                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), _test)?) as Box<dyn TestExecutor + Send>;
+                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), _test, tx.clone())?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
                 Ok(TestSuiteExecutor {
                     test_suite,
-                    test_executors
+                    test_executors,
+                    rx
                 })
             },
         }

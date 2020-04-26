@@ -53,6 +53,23 @@ pub struct Error {
     pub backend_response: Option<String>,
 }
 
+impl Clone for Error {
+    fn clone(&self) -> Error {
+        Error {
+            // some errors (e.g. ScanError) do not implement clone
+            // easiest way to clone is to use GenericError and hence erase original kind
+            // this is OK for us since we will be displaying messages only
+            // we are cloning only when sending test results back to test suite executor
+            // so this dirty workraround will not affect other errors like YAML parsing error
+            // during loading test suite definition etc.
+            kind: Box::new(ErrorKind::GenericError(String::from(""))),
+            message: self.message.clone(),
+            code: self.code.clone(),
+            backend_response: self.backend_response.clone()
+        }
+    }
+}
+
 pub type Result<T> = result::Result<T, Error>;
 
 /// A crate private constructor for `Error`.

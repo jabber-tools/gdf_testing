@@ -2,6 +2,7 @@ use yaml_rust::{YamlLoader, Yaml};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use guid_create::GUID;
+use std::sync::mpsc;
 
 use crate::yaml_parser::{
     Test, 
@@ -77,11 +78,12 @@ pub struct VAPTestExecutor {
     http_client: HttpClient,
     next_assertion: usize,
     conv_id: String,
-    jwt_token: String
+    jwt_token: String,
+    tx: mpsc::Sender<Test>
 }
 
 impl VAPTestExecutor {
-    pub fn new(vap_access_token: String, vap_url: String, vap_svc_account_email: String, vap_svc_account_password: String, test: Test) -> Result<Self> {
+    pub fn new(vap_access_token: String, vap_url: String, vap_svc_account_email: String, vap_svc_account_password: String, test: Test, tx: mpsc::Sender<Test>) -> Result<Self> {
 
         let http_client = HttpClient::new();
         let conv_id = GUID::rand().to_string();
@@ -97,7 +99,8 @@ impl VAPTestExecutor {
             http_client,
             next_assertion: 0,
             conv_id,
-            jwt_token
+            jwt_token,
+            tx
         })
     }
 
@@ -165,6 +168,10 @@ impl TestExecutor for VAPTestExecutor {
 
     fn get_next_assertion_no(&self) -> usize {
         self.next_assertion
+    }
+
+    fn send_test_results(&self) {
+        self.tx.send(self.test.clone()).unwrap();
     }
 
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
@@ -243,12 +250,14 @@ mod tests {
        let yaml: &Yaml = &docs[0];
        let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
 
+       let (tx, rx) = mpsc::channel();
+
        let executor = VAPTestExecutor::new(
         suite.suite_spec.config.get("vap_access_token").unwrap().to_owned(),
         suite.suite_spec.config.get("vap_url").unwrap().to_owned(),
         suite.suite_spec.config.get("vap_svc_account_email").unwrap().to_owned(),
         suite.suite_spec.config.get("vap_svc_account_password").unwrap().to_owned(),
-        suite.tests[0].clone()).unwrap();
+        suite.tests[0].clone(), tx).unwrap();
         
         assert_eq!(executor.jwt_token.trim().len() > 0, true);
 

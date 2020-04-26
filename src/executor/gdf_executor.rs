@@ -2,6 +2,7 @@ use reqwest;
 use guid_create::GUID;
 use yaml_rust::{YamlLoader, Yaml};
 use std::collections::HashMap;
+use std::sync::mpsc;
 
 use crate::errors::{Result, ErrorKind, new_service_call_error, new_error_from, Error};
 use crate::json_parser::{
@@ -39,10 +40,11 @@ pub struct GDFDefaultTestExecutor {
     token: GoogleApisOauthToken,
     conv_id: String,
     cred: GDFCredentials,
+    tx: mpsc::Sender<Test>
 }
 
 impl GDFDefaultTestExecutor {
-    pub fn new(credentials_file: String, test: Test) -> Result<Self> {
+    pub fn new(credentials_file: String, test: Test, tx: mpsc::Sender<Test>) -> Result<Self> {
 
         let http_client = HttpClient::new();
         let token = get_google_api_token(&credentials_file, &http_client)?;
@@ -56,6 +58,7 @@ impl GDFDefaultTestExecutor {
             token: token,
             conv_id: conv_id,
             cred: cred,
+            tx
         })
     }
 }
@@ -85,6 +88,10 @@ impl TestExecutor for GDFDefaultTestExecutor {
 
     fn get_next_assertion_no(&self) -> usize {
         self.next_assertion
+    }
+
+    fn send_test_results(&self) {
+        self.tx.send(self.test.clone()).unwrap();
     }
 
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
@@ -162,6 +169,7 @@ mod tests {
             if let None = details_result {
                 println!("all assertions processed!");
                 break; // all asertions were processed -> break
+                test1_executor.set_test_result(TestResult::Ok);
             }
 
             let user_says = &details_result.unwrap().user_says;
@@ -183,7 +191,7 @@ mod tests {
     
     // cargo test -- --show-output test_process_multiple_tests
     #[test]
-    //#[ignore]
+    #[ignore]
     fn test_process_multiple_tests() -> Result<()> {
 
         const YAML_STR: &str =
@@ -235,6 +243,8 @@ mod tests {
 
         let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
 
+        let res_count = suite_executor.test_executors.len();
+
         for mut test_executor in suite_executor.test_executors {
             pool.execute(move || {
         
@@ -249,6 +259,12 @@ mod tests {
             });
         }
         println!("workers initiated!");
+
+        for _ in 0..res_count {
+            let test_result = suite_executor.rx.recv().unwrap();
+            println!("test result {:#?}", test_result);
+        }
+
         Ok(())
     }       
 

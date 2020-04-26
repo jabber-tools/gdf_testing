@@ -47,7 +47,7 @@ pub struct TestAssertion {
     pub test_assertion_result: Option<TestAssertionResult>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TestAssertionResult {
     Ok(String), // contains NLP provider response
     KoIntentNameMismatch(Error), // error contains both error description and NLP provider response (see Error.backend_response)
@@ -60,9 +60,7 @@ impl Clone for TestAssertion {
             user_says: self.user_says.clone(),
             bot_responds_with: self.bot_responds_with.clone(),
             response_checks: self.response_checks.clone(),
-            // no need to clone, we are cloning TestAssertion (as part of Test) only when passing test suite executor (i.e. result is always None at this point)
-            // cloning test_assertion_result requires cloning Error and that is challenging since Error sources are different 3rd party errors which do not implement Clone trait
-            test_assertion_result: None
+            test_assertion_result: self.test_assertion_result.clone()
         }
     }
 }
