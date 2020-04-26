@@ -31,8 +31,7 @@ use crate::executor::{TestExecutor, TestSuiteExecutor};
 pub type HttpClient = reqwest::blocking::Client;
 
 pub struct GDFDefaultTestExecutor {
-    test_idx: usize,
-    parent_suite: TestSuite,
+    test: Test,
     next_assertion: usize,
     http_client: HttpClient,
     token: GoogleApisOauthToken,
@@ -41,7 +40,7 @@ pub struct GDFDefaultTestExecutor {
 }
 
 impl GDFDefaultTestExecutor {
-    pub fn new(credentials_file: String, test_idx: usize, parent_suite: TestSuite) -> Result<Self> {
+    pub fn new(credentials_file: String, test: Test) -> Result<Self> {
 
         let http_client = HttpClient::new();
         let token = get_google_api_token(&credentials_file, &http_client)?;
@@ -49,8 +48,7 @@ impl GDFDefaultTestExecutor {
         let cred = file_to_gdf_credentials(&credentials_file)?;
 
         Ok(GDFDefaultTestExecutor {
-            test_idx,
-            parent_suite,
+            test,
             next_assertion: 0,
             http_client: http_client,
             token: token,
@@ -67,7 +65,7 @@ impl TestExecutor for GDFDefaultTestExecutor {
     }
 
     fn get_assertions(&self) -> &Vec<TestAssertion> {
-        &self.parent_suite.tests[self.test_idx].assertions
+        &self.test.assertions
     }
 
     fn get_next_assertion_no(&self) -> usize {
@@ -165,7 +163,7 @@ mod tests {
     
     // cargo test -- --show-output test_process_multiple_tests
     #[test]
-     #[ignore]
+    // #[ignore]
     fn test_process_multiple_tests() -> Result<()> {
 
         const YAML_STR: &str =

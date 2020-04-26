@@ -71,8 +71,7 @@ pub struct VAPTestExecutor {
     vap_url: String,
     vap_svc_account_email: String,
     vap_svc_account_password: String,
-    test_idx: usize,
-    parent_suite: TestSuite,
+    test: Test,
     http_client: HttpClient,
     next_assertion: usize,
     conv_id: String,
@@ -80,7 +79,7 @@ pub struct VAPTestExecutor {
 }
 
 impl VAPTestExecutor {
-    pub fn new(vap_access_token: String, vap_url: String, vap_svc_account_email: String, vap_svc_account_password: String, test_idx: usize, parent_suite: TestSuite) -> Result<Self> {
+    pub fn new(vap_access_token: String, vap_url: String, vap_svc_account_email: String, vap_svc_account_password: String, test: Test) -> Result<Self> {
 
         let http_client = HttpClient::new();
         let conv_id = GUID::rand().to_string();
@@ -92,8 +91,7 @@ impl VAPTestExecutor {
             vap_url,
             vap_svc_account_email,
             vap_svc_account_password,
-            test_idx,
-            parent_suite,
+            test,
             http_client,
             next_assertion: 0,
             conv_id,
@@ -147,7 +145,7 @@ impl TestExecutor for VAPTestExecutor {
     }
 
     fn get_assertions(&self) -> &Vec<TestAssertion> {
-        &self.parent_suite.tests[self.test_idx].assertions
+        &self.test.assertions
     }
 
     fn get_next_assertion_no(&self) -> usize {
@@ -236,8 +234,7 @@ mod tests {
         suite.suite_spec.config.get("vap_url").unwrap().to_owned(),
         suite.suite_spec.config.get("vap_svc_account_email").unwrap().to_owned(),
         suite.suite_spec.config.get("vap_svc_account_password").unwrap().to_owned(),
-        0, 
-        suite.clone()).unwrap();
+        suite.tests[0].clone()).unwrap();
         
         assert_eq!(executor.jwt_token.trim().len() > 0, true);
 

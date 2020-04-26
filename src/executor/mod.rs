@@ -133,8 +133,7 @@ impl<'a> TestSuiteExecutor<'a> {
                         vap_url.to_owned(),
                         vap_svc_account_email.to_owned(),
                         vap_svc_account_password.to_owned(),
-                        idx, 
-                        test_suite.clone())?) as Box<dyn TestExecutor + Send>;
+                        test.clone())?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
@@ -152,7 +151,7 @@ impl<'a> TestSuiteExecutor<'a> {
                 let credentials_file = credentials_file.unwrap();
         
                 for (idx, test) in test_suite.tests.iter().enumerate() {
-                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), idx, test_suite.clone())?) as Box<dyn TestExecutor + Send>;
+                    let _executor = Box::new(GDFDefaultTestExecutor::new(credentials_file.to_owned(), test.clone())?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
 
