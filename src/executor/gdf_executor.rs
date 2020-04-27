@@ -247,7 +247,6 @@ mod tests {
 
         for mut test_executor in suite_executor.test_executors {
             pool.execute(move || {
-        
                 while true {
                     println!();
                     let assertion_exec_result = test_executor.execute_next_assertion();
