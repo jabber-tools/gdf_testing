@@ -334,7 +334,6 @@ mod tests {
             pool.execute(move || {
         
                 while true {
-                    println!();
                     let assertion_exec_result = test_executor.execute_next_assertion();
                     if let None =  assertion_exec_result {
                         break;
