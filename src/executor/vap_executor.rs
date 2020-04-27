@@ -199,6 +199,7 @@ impl TestExecutor for VAPTestExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::thread_pool::ThreadPool;
 
     const YAML_STR: &str =
     "
@@ -295,6 +296,7 @@ mod tests {
 
             if let None = details_result {
                 println!("all assertions processed!");
+                test1_executor.set_test_result(TestResult::Ok);
                 break; // all asertions were processed -> break
             }
 
@@ -313,4 +315,41 @@ mod tests {
 
         Ok(())
     }    
+
+    // cargo test -- --show-output test_process_vap_multiple_tests
+    #[test]
+    #[ignore]
+    fn test_process_vap_multiple_tests() -> Result<()> {
+        let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
+        let yaml: &Yaml = &docs[0];
+        let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
+    
+        let mut suite_executor = TestSuiteExecutor::new(suite)?;
+
+        let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
+
+        let res_count = suite_executor.test_executors.len();
+
+        for mut test_executor in suite_executor.test_executors {
+            pool.execute(move || {
+        
+                while true {
+                    println!();
+                    let assertion_exec_result = test_executor.execute_next_assertion();
+                    if let None =  assertion_exec_result {
+                        break;
+                    }
+                }             
+                println!("pool.execute closure done");
+            });
+        }
+        println!("workers initiated!");
+
+        for _ in 0..res_count {
+            let test_result = suite_executor.rx.recv().unwrap();
+            println!("test result {:#?}", test_result);
+        }
+
+        Ok(())
+    }      
 }
