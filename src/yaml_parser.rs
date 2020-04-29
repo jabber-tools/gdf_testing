@@ -167,6 +167,19 @@ impl Test {
             test_result: None
         }
     }
+
+    pub fn get_test_error(&self) -> Option<&TestAssertionResult> {
+        for assertion in &self.assertions {
+            if let Some(assertion_result) = &assertion.test_assertion_result {
+                match assertion_result {
+                    TestAssertionResult::KoIntentNameMismatch(err) |
+                    TestAssertionResult::KoResponseCheckError(err) => return Some(assertion_result),
+                    _  => {}, 
+                }
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug)]

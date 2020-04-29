@@ -2,7 +2,8 @@ use gdf_testing::errors::{Result, ErrorKind};
 use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::executor::TestSuiteExecutor;
 use gdf_testing::yaml_parser::{
-  TestResult, 
+  TestResult,
+  TestAssertionResult, 
   TestSuite
 };
 
@@ -11,26 +12,32 @@ use gdf_testing::thread_pool::ThreadPool;
 use indicatif::ProgressBar;
 
 #[macro_use] extern crate prettytable;
-use prettytable::{Table, Row, Cell};
+use prettytable::{Table, Row, Cell, Attr};
 
 use std::thread;
 use std::time::Duration;
 
 #[allow(unused_must_use)]
-fn main() -> Result<()> {
+fn main() {
         const YAML_STR: &str =
         "
         suite-spec:
             name: 'Dummy Tracking'
             type: 'DialogFlow'
             config: 
-              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json'
+              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials-cs-am-uat.json'
+#            type: 'DHLVAP'
+#            config: 
+#              - vap_url: 'https://vap-dev.prg-dc.dhl.com:7070'
+#              - vap_access_token: '00b2018c-1a78-415c-8999-0852d503b1f3'
+#              - vap_svc_account_email: 'dummy-cs@iam.vap.dhl.com'
+#              - vap_svc_account_password: 'dummyPassword123'
         tests:
             - name: 'Hello - track'
               desc: 'Simple initial two turn tracking dialog'
               assertions:
                 - userSays: 'Hello'
-                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen2'
                 - userSays: 'track a package'
                   botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
                   responseChecks:
@@ -41,7 +48,7 @@ fn main() -> Result<()> {
               desc: 'Very similar second test'
               assertions:
                 - userSays: 'Hi'
-                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen2'
                 - userSays: 'track a package please'
                   botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
                   responseChecks:
@@ -78,7 +85,7 @@ fn main() -> Result<()> {
     let yaml: &Yaml = &docs[0];
     let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
 
-    let mut suite_executor = TestSuiteExecutor::new(suite)?;
+    let mut suite_executor = TestSuiteExecutor::new(suite).unwrap();
 
     let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
 
@@ -102,43 +109,73 @@ fn main() -> Result<()> {
 
     println!("Runnint tests...");
     for _ in 0..test_count {
-        let test_result = suite_executor.rx.recv().unwrap();
-        executed_tests.push(test_result);
-        bar.inc(1);
+        let executed_test = suite_executor.rx.recv().unwrap();
         
+        /*let test_result = executed_test.get_test_error();
+
+        if let Some(test_error_result) = test_result {
+          
+          match test_error_result {
+            TestAssertionResult::KoIntentNameMismatch(err) => {
+              println!("[{}] Intent name mismatch: {}", executed_test.name, err.message);
+            },
+            TestAssertionResult::KoResponseCheckError(err) => {
+              println!("[{}] Assertion post check error: {}", executed_test.name, err.message);
+            },
+            _  => {/* this will never happen but Rust does not know that*/} 
+          }
+
+        } else {
+          println!("[{}] no result!", executed_test.name);
+        }*/
+        bar.inc(1);
+        executed_tests.push(executed_test);
     }
 
-    println!("Tests results below:");
+
+    println!("");
+
+    let mut table = Table::new();
+    table.add_row(row!["Test name", "Result", "Error message"]);
 
     for test in &executed_tests {
       let test_result_icon; // ✔ ❌ �
+      let mut test_err_msg: Option<&str> = None;
       if let Some(test_result) = &test.test_result {
         match test_result {
-          TestResult::Ok => test_result_icon = "OK",
-          _ => test_result_icon = "KO"
+          TestResult::Ok => {
+            test_result_icon = "OK";
+            test_err_msg = None;
+          },
+          _ => {
+            test_result_icon = "KO";
+            let test_error_result = &test.get_test_error().unwrap(); // quick and dirty ;)
+
+            match test_error_result {
+              TestAssertionResult::KoIntentNameMismatch(err) |
+              TestAssertionResult::KoResponseCheckError(err) => {
+                test_err_msg = Some(&err.message);
+              },
+              _  => {/* this will never happen but Rust does not know that*/}             
+            }  
+          }
         }
       } else {
         test_result_icon = "??"; // this should never happen, but never say never :)
       }
 
-      println!("{} [{}] ", test_result_icon, test.name);
-      
+      if let Some(err_msg) = test_err_msg {
+        table.add_row(row![test.name, test_result_icon, err_msg]);
+      } else {
+        table.add_row(row![test.name, test_result_icon, ""]);
+      }
+
     }
 
-    println!(""); // without this last println from previous loop is not displayed!
-
-    // println!("");println!("");println!("");println!("");
-    // println!("{:#?}", executed_tests);
-
-    let mut table = Table::new();
-    table.add_row(row!["Test name", "Error message"]);
-    for test in &executed_tests {
-      let test_to_str = format!("{:#?}", &test);
-      // table.add_row(row![test.name, &test_to_str]);
-      table.add_row(row![test.name, "TBD..."]);
-    }
     table.printstd();
     println!(""); // without this table bottom row is not displayed
 
-    Ok(())
+
+    // println!("");println!("");println!("");println!("");
+    // println!("{:#?}", executed_tests);
 }
