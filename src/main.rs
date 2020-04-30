@@ -1,21 +1,52 @@
+use std::thread;
+use std::time::Duration;
 use gdf_testing::errors::{Result, ErrorKind};
 use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::executor::TestSuiteExecutor;
+use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::{
+  Test,
   TestResult,
   TestAssertionResult, 
   TestSuite
 };
 
-use gdf_testing::thread_pool::ThreadPool;
-
-use indicatif::ProgressBar;
-
 #[macro_use] extern crate prettytable;
 use prettytable::{Table, Row, Cell, Attr};
+use indicatif::{ ProgressBar, ProgressStyle};
+use ansi_term::Colour::{Red, Green, Yellow};
 
-use std::thread;
-use std::time::Duration;
+fn get_test_result_str_and_msg(test: &Test) -> (String, Option<String>) {
+  let OK_STR = Green.paint("OK").to_string();
+  let KO_STR = Red.paint("KO").to_string();
+  let UNKNOWN_STR = Yellow.paint("??").to_string();
+
+  let test_result_icon; 
+  let mut test_err_msg: Option<String> = None;
+  if let Some(test_result) = &test.test_result {
+    match test_result {
+      TestResult::Ok => {
+        test_result_icon = OK_STR;
+        test_err_msg = None;
+      },
+      _ => {
+        test_result_icon = KO_STR;
+        let test_error_result = test.get_test_error().unwrap(); // quick and dirty ;)
+
+        match test_error_result {
+          TestAssertionResult::KoIntentNameMismatch(err) |
+          TestAssertionResult::KoResponseCheckError(err) => {
+            test_err_msg = Some(err.message.to_owned());
+          },
+          _  => {/* this will never happen but Rust does not know that*/}             
+        }  
+      }
+    }
+  } else {
+    test_result_icon = UNKNOWN_STR; // this should never happen, but never say never :)
+  }  
+  (test_result_icon.to_string(), test_err_msg)
+}
 
 #[allow(unused_must_use)]
 fn main() {
@@ -91,47 +122,38 @@ fn main() {
 
     let test_count = suite_executor.test_executors.len();
 
-    let bar = ProgressBar::new(test_count as u64);
+    
+    let sty = ProgressStyle::default_bar()
+        .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+        .progress_chars("##-");    
+
+    let pb = ProgressBar::new(test_count as u64);
+    pb.set_style(sty);
 
     for mut test_executor in suite_executor.test_executors {
         pool.execute(move || {
             while true {
                 let assertion_exec_result = test_executor.execute_next_assertion();
-                thread::sleep(Duration::from_millis(2000)); // just for nice progress bar debugging! remove from final code!
                 if let None =  assertion_exec_result {
                     break;
                 }
             }             
         });
     }
-
     let mut executed_tests = vec![];
 
     println!("Runnint tests...");
-    for _ in 0..test_count {
+    pb.set_position(1);
+    for i in 0..test_count /*lower bound inclusive, upper bound exclusive!*/ { 
         let executed_test = suite_executor.rx.recv().unwrap();
-        
-        /*let test_result = executed_test.get_test_error();
-
-        if let Some(test_error_result) = test_result {
-          
-          match test_error_result {
-            TestAssertionResult::KoIntentNameMismatch(err) => {
-              println!("[{}] Intent name mismatch: {}", executed_test.name, err.message);
-            },
-            TestAssertionResult::KoResponseCheckError(err) => {
-              println!("[{}] Assertion post check error: {}", executed_test.name, err.message);
-            },
-            _  => {/* this will never happen but Rust does not know that*/} 
-          }
-
-        } else {
-          println!("[{}] no result!", executed_test.name);
-        }*/
-        bar.inc(1);
+        let (test_result_str, test_err_msg) = get_test_result_str_and_msg(&executed_test);
+        pb.println(format!("{} Finished test {} ({}/{})", test_result_str, executed_test.name, i + 1, test_count));
+        pb.inc(1);    
+        pb.set_message(&format!("Overall progress"));
         executed_tests.push(executed_test);
+        thread::sleep(Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
     }
-
+    pb.finish_with_message("All tests executed!");
 
     println!("");
 
@@ -139,35 +161,12 @@ fn main() {
     table.add_row(row!["Test name", "Result", "Error message"]);
 
     for test in &executed_tests {
-      let test_result_icon; // ✔ ❌ �
-      let mut test_err_msg: Option<&str> = None;
-      if let Some(test_result) = &test.test_result {
-        match test_result {
-          TestResult::Ok => {
-            test_result_icon = "OK";
-            test_err_msg = None;
-          },
-          _ => {
-            test_result_icon = "KO";
-            let test_error_result = &test.get_test_error().unwrap(); // quick and dirty ;)
-
-            match test_error_result {
-              TestAssertionResult::KoIntentNameMismatch(err) |
-              TestAssertionResult::KoResponseCheckError(err) => {
-                test_err_msg = Some(&err.message);
-              },
-              _  => {/* this will never happen but Rust does not know that*/}             
-            }  
-          }
-        }
-      } else {
-        test_result_icon = "??"; // this should never happen, but never say never :)
-      }
+      let (test_result_str, test_err_msg) = get_test_result_str_and_msg(test);
 
       if let Some(err_msg) = test_err_msg {
-        table.add_row(row![test.name, test_result_icon, err_msg]);
+        table.add_row(row![test.name, test_result_str, err_msg]);
       } else {
-        table.add_row(row![test.name, test_result_icon, ""]);
+        table.add_row(row![test.name, test_result_str, ""]);
       }
 
     }
