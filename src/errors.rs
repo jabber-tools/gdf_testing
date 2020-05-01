@@ -7,6 +7,8 @@ use reqwest;
 use jsonwebtoken;
 use yaml_rust::scanner::ScanError;
 use reqwest::header::InvalidHeaderValue;
+use std::sync::mpsc::SendError;
+use crate::yaml_parser::Test;
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -22,7 +24,8 @@ pub enum ErrorKind {
     GenericError(String),
     InvalidHeaderValueError(InvalidHeaderValue),
     InvalidTestAssertionEvaluation,
-    InvalidTestAssertionResponseCheckEvaluation
+    InvalidTestAssertionResponseCheckEvaluation,
+    ChannelSendError(SendError<Test>)
 }
 
 impl fmt::Display for ErrorKind {
@@ -41,6 +44,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::InvalidHeaderValueError(err) => write!(f, "InvalidHeaderValueError"),
             ErrorKind::InvalidTestAssertionEvaluation => write!(f, "InvalidTestAssertionEvaluation"),
             ErrorKind::InvalidTestAssertionResponseCheckEvaluation => write!(f, "InvalidTestAssertionResponseCheckEvaluation"),
+            ErrorKind::ChannelSendError(err) => write!(f, "ChannelSendError"),
         }
     }
 }
@@ -126,7 +130,8 @@ impl StdError for Error {
             ErrorKind::GenericError(ref err) => None,
             ErrorKind::InvalidHeaderValueError(ref err) => Some(err),
             ErrorKind::InvalidTestAssertionEvaluation => None,
-            ErrorKind::InvalidTestAssertionResponseCheckEvaluation => None
+            ErrorKind::InvalidTestAssertionResponseCheckEvaluation => None,
+            ErrorKind::ChannelSendError(ref err) => Some(err),
         }
     }
 }
@@ -182,6 +187,12 @@ impl From<yaml_rust::scanner::ScanError> for Error {
 impl From<InvalidHeaderValue> for Error {
     fn from(error: InvalidHeaderValue) -> Error {
         new_error_from(ErrorKind::InvalidHeaderValueError(error))
+    }    
+}
+
+impl From<SendError<Test>> for Error {
+    fn from(error: SendError<Test>) -> Error {
+        new_error_from(ErrorKind::ChannelSendError(error))
     }    
 }
 

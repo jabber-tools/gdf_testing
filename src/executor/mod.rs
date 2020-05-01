@@ -40,7 +40,7 @@ pub trait TestExecutor {
     fn set_test_result(&mut self, test_result: TestResult);
     fn set_test_assertion_result(&mut self, test_assertion_result: TestAssertionResult);
     fn get_next_assertion_no(&self) -> usize;
-    fn send_test_results(&self);
+    fn send_test_results(&self) -> Result<()>;
     //
     // core abstract method to be provided for every test executor //
     //

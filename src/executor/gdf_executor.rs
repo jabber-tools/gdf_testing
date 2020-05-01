@@ -3,6 +3,8 @@ use guid_create::GUID;
 use yaml_rust::{YamlLoader, Yaml};
 use std::collections::HashMap;
 use std::sync::mpsc;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use crate::errors::{Result, ErrorKind, new_service_call_error, new_error_from, Error};
 use crate::json_parser::{
@@ -90,8 +92,9 @@ impl TestExecutor for GDFDefaultTestExecutor {
         self.next_assertion
     }
 
-    fn send_test_results(&self) {
-        self.tx.send(self.test.clone()).unwrap();
+    fn send_test_results(&self) -> Result<()> {
+        self.tx.send(self.test.clone())?;
+        Ok(())
     }
 
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
@@ -241,7 +244,8 @@ mod tests {
     
         let mut suite_executor = TestSuiteExecutor::new(suite)?;
 
-        let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
+        let running = Arc::new(AtomicBool::new(true));
+        let pool = ThreadPool::new(4, running); // for workers is good match for modern multi core PCs
 
         let res_count = suite_executor.test_executors.len();
 

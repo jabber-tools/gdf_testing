@@ -1,5 +1,8 @@
 use std::thread;
 use std::time::Duration;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use gdf_testing::errors::{Result, ErrorKind};
 use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::executor::TestSuiteExecutor;
@@ -15,6 +18,7 @@ use gdf_testing::yaml_parser::{
 use prettytable::{Table, Row, Cell, Attr};
 use indicatif::{ ProgressBar, ProgressStyle};
 use ansi_term::Colour::{Red, Green, Yellow};
+use ctrlc;
 
 fn get_test_result_str_and_msg(test: &Test) -> (String, Option<String>) {
   let OK_STR = Green.paint("OK").to_string();
@@ -118,7 +122,9 @@ fn main() {
 
     let mut suite_executor = TestSuiteExecutor::new(suite).unwrap();
 
-    let pool = ThreadPool::new(4); // for workers is good match for modern multi core PCs
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    let pool = ThreadPool::new(4, running.clone()); // for workers is good match for modern multi core PCs
 
     let test_count = suite_executor.test_executors.len();
 
@@ -130,6 +136,12 @@ fn main() {
     let pb = ProgressBar::new(test_count as u64);
     pb.set_style(sty);
 
+    ctrlc::set_handler(move || {
+        println!("CTRL+C detected!");
+        r.store(false, Ordering::SeqCst);
+    }).expect("Error setting Ctrl-C handler");    
+
+
     for mut test_executor in suite_executor.test_executors {
         pool.execute(move || {
             while true {
@@ -140,18 +152,27 @@ fn main() {
             }             
         });
     }
+
     let mut executed_tests = vec![];
 
     println!("Runnint tests...");
     pb.set_position(1);
     for i in 0..test_count /*lower bound inclusive, upper bound exclusive!*/ { 
-        let executed_test = suite_executor.rx.recv().unwrap();
+
+        let recv_res = suite_executor.rx.recv();
+
+        if let Err(some_err) = recv_res {
+          println!("test results receiving channel broken, terminating.");
+          break;
+        }
+
+        let executed_test = recv_res.unwrap();
         let (test_result_str, test_err_msg) = get_test_result_str_and_msg(&executed_test);
         pb.println(format!("{} Finished test {} ({}/{})", test_result_str, executed_test.name, i + 1, test_count));
         pb.inc(1);    
         pb.set_message(&format!("Overall progress"));
         executed_tests.push(executed_test);
-        thread::sleep(Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
+        // thread::sleep(Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
     }
     pb.finish_with_message("All tests executed!");
 

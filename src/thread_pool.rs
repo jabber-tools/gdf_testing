@@ -2,6 +2,8 @@ use std::thread;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 // job is closure that consumes its environment -> FnOnce
 // jobs must be sendable to other thread -> Send
@@ -25,7 +27,7 @@ pub struct ThreadPool {
 }
 
 impl ThreadPool {
-    pub fn new(size: usize) -> ThreadPool {
+    pub fn new(size: usize, running: Arc<AtomicBool>) -> ThreadPool {
         assert!(size > 0);
 
         let (sender, receiver) = mpsc::channel();
@@ -37,7 +39,7 @@ impl ThreadPool {
         let mut workers = Vec::with_capacity(size);
 
         for id in 0..size {
-            workers.push(Worker::new(id, Arc::clone(&receiver)));
+            workers.push(Worker::new(id, Arc::clone(&receiver), running.clone()));
         }
 
         ThreadPool {
@@ -84,12 +86,26 @@ struct Worker {
 }
 
 impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>, running: Arc<AtomicBool>) -> Worker {
         let thread = thread::spawn(move || {
             loop {
+                // thread::sleep(Duration::from_millis(5000)); // just for debugging
                 // receive mutex lock: lock()
                 // receive message from channel once available: recv()
-                let message = receiver.lock().unwrap().recv().unwrap();
+                
+                let recv_res = receiver.lock().unwrap().recv();
+                
+                if let Err(some_err) = recv_res {
+                    println!("Sender for worker {} got disconnected, worker will terminate.", id);
+                    break;
+                }
+
+                let message = recv_res.unwrap();
+
+                if running.load(Ordering::SeqCst) == false {
+                    println!("Worker {} was told to terminate (ctrl+c pressed).", id);
+                    break; // break the worker loop once asked to do so
+                }
 
                 match message {
                     Message::NewJob(job) => {
@@ -97,7 +113,7 @@ impl Worker {
                         job(); //this will do the job, i.e. execute dialog test
                     },
                     Message::Terminate => {
-                        println!("Worker {} was told to terminate.", id);
+                        println!("Worker {} was told to terminate since thread pool is terminating.", id);
                         break; // break the worker loop once asked to do so
                     },
                 }
