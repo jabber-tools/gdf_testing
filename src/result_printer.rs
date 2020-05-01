@@ -57,6 +57,4 @@ pub fn get_test_result_str_and_msg(test: &Test) -> (String, Option<String>) {
     }
 
     table.printstd();
-    println!(""); // without this table bottom row is not displayed    
-
   }

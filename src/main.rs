@@ -6,14 +6,10 @@ use std::sync::Arc;
 use ctrlc;
 use indicatif::{ ProgressBar, ProgressStyle};
 
-use gdf_testing::errors::{Result, ErrorKind};
 use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::{
-  Test,
-  TestResult,
-  TestAssertionResult, 
   TestSuite
 };
 use gdf_testing::result_printer;
@@ -89,8 +85,7 @@ fn main() {
     let suite_executor = TestSuiteExecutor::new(suite).unwrap();
 
     let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    let pool = ThreadPool::new(4, running.clone()); // for workers is good match for modern multi core PCs
+    let pool = ThreadPool::new(4, running.clone()); // TBD: make thread pool size configurable
 
     let test_count = suite_executor.test_executors.len();
 
@@ -104,13 +99,13 @@ fn main() {
 
     ctrlc::set_handler(move || {
         println!("CTRL+C detected!");
-        r.store(false, Ordering::SeqCst);
+        running.store(false, Ordering::SeqCst);
     }).expect("Error setting Ctrl-C handler");    
 
 
     for mut test_executor in suite_executor.test_executors {
         pool.execute(move || {
-            while true {
+            loop {
                 let assertion_exec_result = test_executor.execute_next_assertion();
                 if let None =  assertion_exec_result {
                     break;
@@ -122,30 +117,28 @@ fn main() {
     let mut executed_tests = vec![];
 
     println!("Runnint tests...");
-    pb.set_position(1);
+    // by common sense we should start at zero but there is probably some bug 
+    // in indicatif library and it works properly only when we set it initually to 1
+    pb.set_position(1); 
     for i in 0..test_count /*lower bound inclusive, upper bound exclusive!*/ { 
 
         let recv_res = suite_executor.rx.recv();
 
-        if let Err(some_err) = recv_res {
+        if let Err(_) = recv_res {
           println!("test results receiving channel broken, terminating.");
           break;
         }
 
         let executed_test = recv_res.unwrap();
-        let (test_result_str, test_err_msg) = result_printer::get_test_result_str_and_msg(&executed_test);
+        let (test_result_str, _) = result_printer::get_test_result_str_and_msg(&executed_test);
         pb.println(format!("{} Finished test {} ({}/{})", test_result_str, executed_test.name, i + 1, test_count));
         pb.inc(1);    
         pb.set_message(&format!("Overall progress"));
         executed_tests.push(executed_test);
-        // thread::sleep(Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
+        thread::sleep(Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
     }
     pb.finish_with_message("All tests executed!");
 
     println!("");
-
     result_printer::print_test_summary_table(&executed_tests);
-
-    // println!("");println!("");println!("");println!("");
-    // println!("{:#?}", executed_tests);
 }
