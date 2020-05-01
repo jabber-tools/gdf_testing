@@ -1,14 +1,11 @@
 use jmespath;
 use std::fmt;
-use std::error::Error;
-use jmespath::JmespathError;
 use jmespath::Variable;
 use serde_json::json;
 use serde_json::from_str;
-use std::collections::HashMap;
-use assert_json_diff::{assert_json_eq, assert_json_eq_no_panic};
+use assert_json_diff::assert_json_eq_no_panic;
 use std::rc::Rc;
-use crate::errors::{Result, ErrorKind};
+use crate::errors::Result;
 type StdResult<T, E> = std::result::Result<T, E>;
 
 // JMESPath types.
@@ -88,7 +85,7 @@ impl<'a> JsonParser<'a> {
   }      
 
   pub fn extract_as_object(variable: &'a Rc<Variable>) -> Option<Rc<Variable>> {
-    if (variable.is_object() == true) {
+    if variable.is_object() == true {
       Some(variable.clone())
     } else {
       None
@@ -148,6 +145,8 @@ impl<'a> JsonParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_json_diff::{assert_json_eq};
+    use crate::errors::{ErrorKind};
     
     const JSON: &str =
     r#"

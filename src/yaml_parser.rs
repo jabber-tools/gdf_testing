@@ -172,8 +172,8 @@ impl Test {
         for assertion in &self.assertions {
             if let Some(assertion_result) = &assertion.test_assertion_result {
                 match assertion_result {
-                    TestAssertionResult::KoIntentNameMismatch(err) |
-                    TestAssertionResult::KoResponseCheckError(err) => return Some(assertion_result),
+                    TestAssertionResult::KoIntentNameMismatch(_) |
+                    TestAssertionResult::KoResponseCheckError(_) => return Some(assertion_result),
                     _  => {}, 
                 }
             }
@@ -408,7 +408,6 @@ mod tests {
     use super::*;
     use yaml_rust::YamlLoader;
     use assert_json_diff::assert_json_eq;
-    use serde_json::{json, from_str};
     use crate::json_parser::*;
 
     // convenience function for testing

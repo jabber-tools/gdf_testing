@@ -1,10 +1,6 @@
-use reqwest;
-use guid_create::GUID;
-use std::collections::HashMap;
-use yaml_rust::{YamlLoader, Yaml};
 use std::sync::mpsc;
 
-use crate::errors::{Result, ErrorKind, new_service_call_error, new_error, new_error_from, Error};
+use crate::errors::{Result, ErrorKind, new_service_call_error, new_error, new_error_from};
 use crate::json_parser::{
     JsonParser, 
     JmespathType
@@ -20,17 +16,11 @@ use crate::yaml_parser::{
     TestAssertionResponseCheckValue,
     TestAssertionResponseCheck
 };
-use crate::gdf::{
-    get_google_api_token, 
-    prepare_dialogflow_request,
-    call_dialogflow, 
-    file_to_gdf_credentials
-};
 
 mod gdf_executor;
 mod vap_executor;
-use crate::executor::vap_executor::VAPTestExecutor;
-use crate::executor::gdf_executor::GDFDefaultTestExecutor;
+use vap_executor::VAPTestExecutor;
+use gdf_executor::GDFDefaultTestExecutor;
 
 pub trait TestExecutor {
     // helper abstaract methods so that we can use default implementations for next_assertion_details/execute_next_assertion
@@ -53,7 +43,7 @@ pub trait TestExecutor {
         let assertions = self.get_assertions();
 
         if next_assertion_no >= assertions.len() {
-            self.send_test_results();
+            let _ = self.send_test_results();
             None
         } else {
             let assertion_to_execute = &assertions[next_assertion_no];
@@ -68,7 +58,7 @@ pub trait TestExecutor {
 
         if next_assertion_no >= assertions.len() {
             self.set_test_result(TestResult::Ok);
-            self.send_test_results();
+            let _ = self.send_test_results();
             return None;
         } else {
             let assertion_to_execute = &assertions[next_assertion_no];
@@ -80,7 +70,7 @@ pub trait TestExecutor {
                 self.set_test_assertion_result(TestAssertionResult::KoIntentNameMismatch(intent_mismatch_error));
                 self.set_test_result(TestResult::Ko);
                 self.move_behind_last_assertion();
-                self.send_test_results();
+                let _ = self.send_test_results();
                 return None;
             } 
 
@@ -94,7 +84,7 @@ pub trait TestExecutor {
                     self.set_test_assertion_result(TestAssertionResult::KoResponseCheckError(some_response_check_error));
                     self.set_test_result(TestResult::Ko);
                     self.move_behind_last_assertion();
-                    self.send_test_results();
+                    let _ = self.send_test_results();
                     return None;
                 }
             } 
@@ -108,7 +98,7 @@ pub trait TestExecutor {
 }
 
 pub struct TestSuiteExecutor<'a> {
-    test_suite: TestSuite,
+    pub test_suite: TestSuite,
     pub test_executors: Vec<Box<dyn TestExecutor + 'a + Send>>, // Box references are by default 'static! we must ecplivitly indicate shorter lifetime
     pub rx: mpsc::Receiver<Test>
 }
@@ -192,7 +182,7 @@ impl<'a> TestSuiteExecutor<'a> {
 
 
     pub fn process_assertion_response_check(response_check: &TestAssertionResponseCheck, response: &str) -> Result<()> {
-        /// HELPER closures ///
+        /****  HELPER closures ****/
         let process_bool_equals = |bool_val_expected: &bool| -> Result<()> {
             let parser = JsonParser::new(response);
             let search_result = parser.search(&response_check.expression)?;
@@ -401,7 +391,7 @@ impl<'a> TestSuiteExecutor<'a> {
             }
         };        
 
-        /// MAIN processing logic of the function utilizing closures defined above ///
+        /**** MAIN processing logic of the function utilizing closures defined above ****/
         match &response_check.value {
         
             TestAssertionResponseCheckValue::BoolVal(bool_val_expected) => {

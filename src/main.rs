@@ -9,32 +9,24 @@ use indicatif::{ ProgressBar, ProgressStyle};
 use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
-use gdf_testing::yaml_parser::{
-  TestSuite
-};
+use gdf_testing::yaml_parser::{TestSuite};
 use gdf_testing::result_printer;
 
-#[allow(unused_must_use)]
 fn main() {
-        const YAML_STR: &str =
+        #[allow(dead_code)]
+        const YAML_STR_GDF: &str =
         "
         suite-spec:
             name: 'Dummy Tracking'
             type: 'DialogFlow'
             config: 
               - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials-cs-am-uat.json'
-#            type: 'DHLVAP'
-#            config: 
-#              - vap_url: 'https://vap-dev.prg-dc.dhl.com:7070'
-#              - vap_access_token: '00b2018c-1a78-415c-8999-0852d503b1f3'
-#              - vap_svc_account_email: 'dummy-cs@iam.vap.dhl.com'
-#              - vap_svc_account_password: 'dummyPassword123'
         tests:
             - name: 'Hello - track'
               desc: 'Simple initial two turn tracking dialog'
               assertions:
                 - userSays: 'Hello'
-                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen2'
+                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
                 - userSays: 'track a package'
                   botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
                   responseChecks:
@@ -45,7 +37,7 @@ fn main() {
               desc: 'Very similar second test'
               assertions:
                 - userSays: 'Hi'
-                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen2'
+                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
                 - userSays: 'track a package please'
                   botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
                   responseChecks:
@@ -78,7 +70,67 @@ fn main() {
                       value: true
        ";         
 
-    let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
+       #[allow(dead_code)]
+       const YAML_STR_VAP: &str =
+       "
+       suite-spec:
+           name: 'Dummy Tracking'
+           type: 'DHLVAP'
+           config: 
+             - vap_url: 'https://vap-dev.prg-dc.dhl.com:7070'
+             - vap_access_token: '00b2018c-1a78-415c-8999-0852d503b1f3'
+             - vap_svc_account_email: 'dummy-cs@iam.vap.dhl.com'
+             - vap_svc_account_password: 'dummyPassword123'
+       tests:
+           - name: 'Hello - track'
+             desc: 'Simple initial two turn tracking dialog'
+             assertions:
+               - userSays: 'Hello'
+                 botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+               - userSays: 'track a package'
+                 botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
+                 responseChecks:
+                   - expression: 'dfResponse.queryResult.allRequiredParamsPresent'
+                     operator: 'equals'
+                     value: true
+           - name: 'Hello - track - entity parsing'
+             desc: 'Very similar second test'
+             assertions:
+               - userSays: 'Hi'
+                 botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+               - userSays: 'track a package please'
+                 botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
+                 responseChecks:
+                   - expression: 'dfResponse.queryResult.allRequiredParamsPresent'
+                     operator: 'equals'
+                     value: true
+               - userSays: 'it is 1234567891'
+                 botRespondsWith: ['Tracking|CS|3|ID valid|Gen']
+                 responseChecks:
+                   - expression: 'dfResponse.queryResult.action'
+                     operator: 'equals'
+                     value: 'express_track'
+                   - expression: 'dfResponse.queryResult.parameters.tracking_id'
+                     operator: 'equals'
+                     value: '1234567891'
+           - name: 'Human transfer'
+             desc: 'Initiation of human transfer'
+             assertions:
+               - userSays: 'talk to representative'
+                 botRespondsWith: 'Representative|CS|0|User request|TPh'
+                 responseChecks:
+                   - expression: 'dfResponse.queryResult.action'
+                     operator: 'equals'
+                     value: 'country_specific_response'                      
+                   - expression: 'dfResponse.queryResult.parameters.event'
+                     operator: 'equals'
+                     value: 'repr_user_request'  
+                   - expression: 'dfResponse.queryResult.allRequiredParamsPresent'
+                     operator: 'equals'
+                     value: true
+      ";             
+
+    let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR_GDF).unwrap();
     let yaml: &Yaml = &docs[0];
     let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
 

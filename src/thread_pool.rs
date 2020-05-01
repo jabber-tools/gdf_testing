@@ -3,7 +3,6 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 
 // job is closure that consumes its environment -> FnOnce
 // jobs must be sendable to other thread -> Send
@@ -89,13 +88,15 @@ impl Worker {
     fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>, running: Arc<AtomicBool>) -> Worker {
         let thread = thread::spawn(move || {
             loop {
-                // thread::sleep(Duration::from_millis(5000)); // just for debugging
+                // thread::sleep(std::time::Duration::from_millis(5000)); // just for debugging
+
+                //    
                 // receive mutex lock: lock()
                 // receive message from channel once available: recv()
-                
+                //
                 let recv_res = receiver.lock().unwrap().recv();
                 
-                if let Err(some_err) = recv_res {
+                if let Err(_) = recv_res {
                     println!("Sender for worker {} got disconnected, worker will terminate.", id);
                     break;
                 }

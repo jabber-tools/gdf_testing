@@ -1,29 +1,17 @@
-use yaml_rust::{YamlLoader, Yaml};
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use guid_create::GUID;
 use std::sync::mpsc;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 
 use crate::yaml_parser::{
     Test, 
     TestResult,
     TestAssertion, 
-    TestAssertionResult,
-    TestSuiteType, 
-    TestSuite, 
-    TestAssertionResponseCheckOperator,
-    TestAssertionResponseCheckValue,
-    TestAssertionResponseCheck
+    TestAssertionResult
 };
-use crate::json_parser::{
-    JsonParser, 
-    JmespathType
-};
+use crate::json_parser::JsonParser;
 use reqwest::header::{HeaderMap, HeaderValue};
-use crate::errors::{Result, ErrorKind, new_service_call_error, new_error_from, new_error, Error};
-use crate::executor::{TestExecutor, TestSuiteExecutor};
+use crate::errors::{Result, ErrorKind, new_service_call_error};
+use crate::executor::TestExecutor;
 pub type HttpClient = reqwest::blocking::Client;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,6 +20,7 @@ pub struct VapAuthenticationResponseAuthentication {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(non_snake_case)]
 pub struct VapAuthenticationResponseUser {
     userId: String,
     email: String,
@@ -40,6 +29,7 @@ pub struct VapAuthenticationResponseUser {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(non_snake_case)]
 pub struct VapAuthenticationResponse {
     pub accessToken: String,
     pub authentication:  VapAuthenticationResponseAuthentication,
@@ -60,10 +50,10 @@ fn prepare_vap_request(vap_access_token: &str, utterance: &str, conv_id: &str) -
     }}"#, _access_token_ = vap_access_token, _utterance_ = utterance, _conv_id_ = conv_id)
 }
 
-fn call_vap (payload: String, conv_id: &str, http_client: &HttpClient, bearer: &str, vap_url: &str) -> Result<(String)> {
+fn call_vap (payload: String, http_client: &HttpClient, bearer: &str, vap_url: &str) -> Result<String> {
     let mut headers = HeaderMap::new();
     let bearer_str = format!("{}", bearer);
-    headers.insert("Authorization", HeaderValue::from_str((&bearer_str)).unwrap());
+    headers.insert("Authorization", HeaderValue::from_str(&bearer_str).unwrap());
     headers.insert("Content-Type", HeaderValue::from_str("application/json").unwrap());
     
     let vap_url = format!("{}/vapapi/channels/generic/v1",vap_url);
@@ -74,8 +64,6 @@ fn call_vap (payload: String, conv_id: &str, http_client: &HttpClient, bearer: &
 pub struct VAPTestExecutor {
     vap_access_token: String,
     vap_url: String,
-    vap_svc_account_email: String,
-    vap_svc_account_password: String,
     test: Test,
     http_client: HttpClient,
     next_assertion: usize,
@@ -95,8 +83,6 @@ impl VAPTestExecutor {
         Ok(VAPTestExecutor {
             vap_access_token,
             vap_url,
-            vap_svc_account_email,
-            vap_svc_account_password,
             test,
             http_client,
             next_assertion: 0,
@@ -180,14 +166,14 @@ impl TestExecutor for VAPTestExecutor {
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
 
         let payload = prepare_vap_request(&self.vap_access_token, &assertion.user_says, &self.conv_id);
-        let resp = call_vap(payload, &self.conv_id, &self.http_client, &self.jwt_token, &self.vap_url)?;
+        let resp = call_vap(payload, &self.http_client, &self.jwt_token, &self.vap_url)?;
         let parser = JsonParser::new(&resp);
-        let realIntentName = parser.search("dfResponse.queryResult.intent.displayName")?;
-        let realIntentName = JsonParser::extract_as_string(&realIntentName);
+        let real_intent_name = parser.search("dfResponse.queryResult.intent.displayName")?;
+        let real_intent_name = JsonParser::extract_as_string(&real_intent_name);
     
-        if let Some(intentName) = realIntentName {
-            if !assertion.bot_responds_with.contains(&intentName.to_string()) {
-                let error_message = format!("Wrong intent name received. Expected one of: '{}', got: '{}'", assertion.bot_responds_with.join(","), intentName);
+        if let Some(intent_name) = real_intent_name {
+            if !assertion.bot_responds_with.contains(&intent_name.to_string()) {
+                let error_message = format!("Wrong intent name received. Expected one of: '{}', got: '{}'", assertion.bot_responds_with.join(","), intent_name);
                 return Err(new_service_call_error(ErrorKind::InvalidTestAssertionEvaluation, error_message, None, Some(resp.to_owned())));
             }
         } else {
@@ -203,6 +189,11 @@ impl TestExecutor for VAPTestExecutor {
 mod tests {
     use super::*;
     use crate::thread_pool::ThreadPool;
+    use yaml_rust::{YamlLoader, Yaml};
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+    use crate::executor::{TestSuiteExecutor};
+    use crate::yaml_parser::TestSuite;
 
     const YAML_STR: &str =
     "
@@ -254,6 +245,7 @@ mod tests {
        let yaml: &Yaml = &docs[0];
        let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
 
+       #[allow(unused_variables)]
        let (tx, rx) = mpsc::channel();
 
        let executor = VAPTestExecutor::new(
@@ -293,7 +285,7 @@ mod tests {
         let mut suite_executor = TestSuiteExecutor::new(suite)?;
         let test1_executor = &mut suite_executor.test_executors[0];
 
-        while true {
+        loop {
             println!();
             let details_result = test1_executor.next_assertion_details();
 
@@ -327,7 +319,7 @@ mod tests {
         let yaml: &Yaml = &docs[0];
         let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
     
-        let mut suite_executor = TestSuiteExecutor::new(suite)?;
+        let suite_executor = TestSuiteExecutor::new(suite)?;
 
         let running = Arc::new(AtomicBool::new(true));
         let pool = ThreadPool::new(4, running); // for workers is good match for modern multi core PCs
@@ -337,7 +329,7 @@ mod tests {
         for mut test_executor in suite_executor.test_executors {
             pool.execute(move || {
         
-                while true {
+                loop {
                     let assertion_exec_result = test_executor.execute_next_assertion();
                     if let None =  assertion_exec_result {
                         break;

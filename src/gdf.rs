@@ -2,7 +2,6 @@ use serde::{Serialize, Deserialize};
 use jsonwebtoken::{encode, Header, Algorithm, EncodingKey, DecodingKey};
 use std::time::SystemTime;
 use std::fs;
-use serde_json::from_str;
 use crate::errors::{Result};
 use reqwest::header::{HeaderMap, HeaderValue};
 
@@ -41,33 +40,36 @@ pub fn file_to_gdf_credentials(file_name: &str) -> Result<GDFCredentials> {
     Ok(cred)
 }
 
+#[allow(dead_code)]
 fn pem_file_to_str(file_name: &str) -> Result<String> {
     let file_str = fs::read_to_string(file_name)?;
     // replace \n literals (i.e. "\\n") with real end line character (i.e. "\n")!
     Ok(file_str.replace("\\n", "\n"))
 }
 
- fn pem_to_encoding_key(file_name: &str) -> Result<EncodingKey> {
+#[allow(dead_code)]
+fn pem_to_encoding_key(file_name: &str) -> Result<EncodingKey> {
     let file_str = fs::read_to_string(file_name)?;
     // replace \n literals (i.e. "\\n") with real end line character (i.e. "\n")!
     let file_str = file_str.replace("\\n", "\n");
     let key = EncodingKey::from_rsa_pem(file_str.into_bytes().as_slice())?;
     Ok(key)
- } 
+} 
 
- fn str_to_encoding_key(priv_key_str: String) -> Result<EncodingKey> {
+fn str_to_encoding_key(priv_key_str: String) -> Result<EncodingKey> {
     let key = EncodingKey::from_rsa_pem(priv_key_str.replace("\\n", "\n").into_bytes().as_slice())?;
     Ok(key)
- }  
+}  
 
-
- fn pem_to_decoding_key<'a>(file_bytes: &'a Vec<u8>) -> Result<DecodingKey<'a>> {
+#[allow(dead_code)]
+fn pem_to_decoding_key<'a>(file_bytes: &'a Vec<u8>) -> Result<DecodingKey<'a>> {
     // DecodingKey::from_rsa_pem(&file_bytes[..]).ok()
     let key = DecodingKey::from_rsa_pem(&file_bytes[..])?;
     Ok(key)
- } 
+} 
 
 // see https://github.com/Keats/jsonwebtoken
+#[allow(dead_code)]
 fn new_token(client_email: &str, priv_key_file: &str) -> Result<String> {
     let _now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
     let claims = Claims {
@@ -108,16 +110,16 @@ pub fn get_google_api_token (gdf_credentials_file: &str, http_client: &reqwest::
 
     let mut headers = HeaderMap::new();   
     let body = format!("grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={}", token);
-    headers.insert("Content-Type", HeaderValue::from_str(("application/x-www-form-urlencoded"))?);
+    headers.insert("Content-Type", HeaderValue::from_str("application/x-www-form-urlencoded")?);
     let resp = http_client.post("https://www.googleapis.com/oauth2/v4/token").body(body).headers(headers).send()?.text()?;
     let google_apis_token = serde_json::from_str::<GoogleApisOauthToken>(&resp)?;
     Ok(google_apis_token)
 }
 
-pub fn call_dialogflow (payload: String, project_id: &str, conv_id: &str, http_client: &reqwest::blocking::Client, bearer: &str) -> Result<(String)> {
+pub fn call_dialogflow (payload: String, project_id: &str, conv_id: &str, http_client: &reqwest::blocking::Client, bearer: &str) -> Result<String> {
     let mut headers = HeaderMap::new();
     let bearer_str = format!("Bearer {}", bearer);
-    headers.insert("Authorization", HeaderValue::from_str((&bearer_str)).unwrap());
+    headers.insert("Authorization", HeaderValue::from_str(&bearer_str).unwrap());
     headers.insert("Content-Type", HeaderValue::from_str("application/json; charset=utf-8").unwrap());
     
     let gdf_url = format!("https://dialogflow.googleapis.com/v2/projects/{}/agent/sessions/{}:detectIntent", project_id, conv_id);
@@ -141,7 +143,6 @@ pub fn prepare_dialogflow_request(utterance: &str) -> String {
 mod tests {
     use super::*;
     use jsonwebtoken::{decode, Validation, errors::ErrorKind };
-    use reqwest::header::{HeaderMap, HeaderValue};
 
     // this is integration test for which you need DialogFlow agent credentials (i.e. private key + associated service account email) and respective public key
     // get the credentials from google cloud console (json file)
