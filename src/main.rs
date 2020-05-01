@@ -1,7 +1,5 @@
-use std::thread;
-use std::time::Duration;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use ctrlc;
 use indicatif::{ ProgressBar, ProgressStyle};
@@ -9,7 +7,7 @@ use indicatif::{ ProgressBar, ProgressStyle};
 use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
-use gdf_testing::yaml_parser::{TestSuite};
+use gdf_testing::yaml_parser::TestSuite;
 use gdf_testing::result_printer;
 
 fn main() {
@@ -187,7 +185,7 @@ fn main() {
         pb.inc(1);    
         pb.set_message(&format!("Overall progress"));
         executed_tests.push(executed_test);
-        thread::sleep(Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
+        // std::thread::sleep(std::time::Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
     }
     pb.finish_with_message("All tests executed!");
 
