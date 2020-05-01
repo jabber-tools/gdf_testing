@@ -3,6 +3,9 @@ use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use ctrlc;
+use indicatif::{ ProgressBar, ProgressStyle};
+
 use gdf_testing::errors::{Result, ErrorKind};
 use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::executor::TestSuiteExecutor;
@@ -13,44 +16,7 @@ use gdf_testing::yaml_parser::{
   TestAssertionResult, 
   TestSuite
 };
-
-#[macro_use] extern crate prettytable;
-use prettytable::{Table, Row, Cell, Attr};
-use indicatif::{ ProgressBar, ProgressStyle};
-use ansi_term::Colour::{Red, Green, Yellow};
-use ctrlc;
-
-fn get_test_result_str_and_msg(test: &Test) -> (String, Option<String>) {
-  let OK_STR = Green.paint("OK").to_string();
-  let KO_STR = Red.paint("KO").to_string();
-  let UNKNOWN_STR = Yellow.paint("??").to_string();
-
-  let test_result_icon; 
-  let mut test_err_msg: Option<String> = None;
-  if let Some(test_result) = &test.test_result {
-    match test_result {
-      TestResult::Ok => {
-        test_result_icon = OK_STR;
-        test_err_msg = None;
-      },
-      _ => {
-        test_result_icon = KO_STR;
-        let test_error_result = test.get_test_error().unwrap(); // quick and dirty ;)
-
-        match test_error_result {
-          TestAssertionResult::KoIntentNameMismatch(err) |
-          TestAssertionResult::KoResponseCheckError(err) => {
-            test_err_msg = Some(err.message.to_owned());
-          },
-          _  => {/* this will never happen but Rust does not know that*/}             
-        }  
-      }
-    }
-  } else {
-    test_result_icon = UNKNOWN_STR; // this should never happen, but never say never :)
-  }  
-  (test_result_icon.to_string(), test_err_msg)
-}
+use gdf_testing::result_printer;
 
 #[allow(unused_must_use)]
 fn main() {
@@ -120,7 +86,7 @@ fn main() {
     let yaml: &Yaml = &docs[0];
     let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
 
-    let mut suite_executor = TestSuiteExecutor::new(suite).unwrap();
+    let suite_executor = TestSuiteExecutor::new(suite).unwrap();
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
@@ -130,7 +96,7 @@ fn main() {
 
     
     let sty = ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+        .template("[{elapsed_precise}] {bar:70.yellow/red} {pos:>7}/{len:7} {msg}")
         .progress_chars("##-");    
 
     let pb = ProgressBar::new(test_count as u64);
@@ -167,7 +133,7 @@ fn main() {
         }
 
         let executed_test = recv_res.unwrap();
-        let (test_result_str, test_err_msg) = get_test_result_str_and_msg(&executed_test);
+        let (test_result_str, test_err_msg) = result_printer::get_test_result_str_and_msg(&executed_test);
         pb.println(format!("{} Finished test {} ({}/{})", test_result_str, executed_test.name, i + 1, test_count));
         pb.inc(1);    
         pb.set_message(&format!("Overall progress"));
@@ -178,23 +144,7 @@ fn main() {
 
     println!("");
 
-    let mut table = Table::new();
-    table.add_row(row!["Test name", "Result", "Error message"]);
-
-    for test in &executed_tests {
-      let (test_result_str, test_err_msg) = get_test_result_str_and_msg(test);
-
-      if let Some(err_msg) = test_err_msg {
-        table.add_row(row![test.name, test_result_str, err_msg]);
-      } else {
-        table.add_row(row![test.name, test_result_str, ""]);
-      }
-
-    }
-
-    table.printstd();
-    println!(""); // without this table bottom row is not displayed
-
+    result_printer::print_test_summary_table(&executed_tests);
 
     // println!("");println!("");println!("");println!("");
     // println!("{:#?}", executed_tests);

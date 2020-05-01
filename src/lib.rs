@@ -4,6 +4,7 @@ pub mod gdf;
 pub mod errors;
 pub mod executor;
 pub mod thread_pool;
+pub mod result_printer;
 
 pub use yaml_parser::*;
 pub use json_parser::*;
@@ -11,3 +12,4 @@ pub use gdf::*;
 pub use errors::*;
 pub use executor::*;
 pub use thread_pool::*;
+pub use result_printer::*;
