@@ -73,8 +73,6 @@ pub fn print_test_summary_table(executed_tests: &Vec<Test>) {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::fs::File;
-  use crate::errors::Result;
 
   #[allow(dead_code)]
   const JSON: &str =
