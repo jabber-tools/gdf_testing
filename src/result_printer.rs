@@ -173,7 +173,8 @@ mod tests {
 
     let ok_str = Green.paint("OK").to_string();
     let ko_str = Red.paint("KO").to_string();
-    let na_str = Yellow.paint("N/A").to_string();
+    let na_str = "N/A".to_string();
+    let ne_str = Yellow.paint("Not executed").to_string();
 
     let mut table_assertion1_postchecks = Table::new();
     table_assertion1_postchecks.add_row(row!["Expression", "Operator", "Value", "Status"]);
@@ -183,27 +184,57 @@ mod tests {
     let mut table_assertion2_postchecks = Table::new();
     table_assertion2_postchecks.add_row(row!["Expression", "Operator", "Value", "Status"]);
     table_assertion2_postchecks.add_row(row!["queryResult.allRequiredParamsPresent", "=", "true", ok_str]);
+    table_assertion2_postchecks.add_row(row!["queryResult.allRequiredParamsPresent", "=", "true", ko_str]);
+
+
+    let mut table_assertion2_postchecks = Table::new();
+    table_assertion2_postchecks.add_row(row!["Expression", "Operator", "Value", "Status"]);
+    table_assertion2_postchecks.add_row(row!["queryResult.allRequiredParamsPresent", "=", "true", ok_str]);
     table_assertion2_postchecks.add_row(row!["queryResult.action", "=", "express_track", ko_str]);
 
 
     let mut table_assertion1 = Table::new();
-    table_assertion1.add_row(row!["Usar says", "Bot responds with", "Status", "Raw response", "Post Checks"]);
-    table_assertion1.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, "{'foo':'bar'}", table_assertion1_postchecks]);
-    table_assertion1.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ko_str, "{'foo':'bar'}", na_str]);
+    table_assertion1.add_row(row!["Test assertions"]);
+    table_assertion1.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
+    table_assertion1.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str, "{'foo':'bar'}"]);
+    table_assertion1.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion1_postchecks, "{'foo':'bar'}"]);
 
     let mut table_assertion2 = Table::new();
-    table_assertion2.add_row(row!["Usar says", "Bot responds with", "Status", "Raw response", "Post Checks"]);
-    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, "{'foo':'bar'}", table_assertion2_postchecks]);
-    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ko_str, "{'foo':'bar'}", na_str]);
+    table_assertion2.add_row(row!["Test assertions"]);
+    table_assertion2.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
+    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str,  "{'foo':'bar'}"]);
+    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ko_str, ne_str, "{'foo':'bar'}"]);
 
 
-    let mut table_test = Table::new();
-    table_test.add_row(row!["Test1"]);
-    table_test.add_row(row![table_assertion1]);
-    table_test.add_row(row!["Test2"]);
-    table_test.add_row(row![table_assertion2]);
+    let mut table_assertion3 = Table::new();
+    table_assertion3.add_row(row!["Test assertions"]);
+    table_assertion3.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
+    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str,  "{'foo':'bar'}"]);
+    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion2_postchecks, JSON]);
 
-    table_test.printstd();
+
+    let mut table_test1 = Table::new();
+    table_test1.add_row(row!["Test1 - ".to_owned() + &ok_str]);
+    table_test1.add_row(row![table_assertion1]);
+
+    
+    let mut table_test2 = Table::new();
+    table_test2.add_row(row!["Test2 - ".to_owned() + &ko_str + "\n" + "Wrong intent name received. Expected one of: 'Generic|BIT|0|Welcome|Gen', got: 'Generic|BIT|0|Welcome|Gen123'"]);
+    table_test2.add_row(row![table_assertion2]);
+
+    let mut table_test3 = Table::new();
+    table_test3.add_row(row!["Test3 - ".to_owned() + &ko_str + "\n" + "Expected value 'express_track' does not match real value: 'express_track123' for expression: queryResult.action"]);
+    table_test3.add_row(row![table_assertion3]);
+
+
+    table_test1.printstd();
+    println!("");
+    println!("");
+    table_test2.printstd();
+    println!("");
+    println!("");
+    table_test3.printstd();
+
   }
 }
 
