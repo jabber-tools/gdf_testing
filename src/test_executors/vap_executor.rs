@@ -11,7 +11,7 @@ use crate::yaml_parser::{
 use crate::json_parser::JsonParser;
 use reqwest::header::{HeaderMap, HeaderValue};
 use crate::errors::{Result, ErrorKind, new_service_call_error};
-use crate::executor::TestExecutor;
+use crate::test_executors::TestExecutor;
 pub type HttpClient = reqwest::blocking::Client;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -192,7 +192,7 @@ mod tests {
     use yaml_rust::{YamlLoader, Yaml};
     use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
-    use crate::executor::{TestSuiteExecutor};
+    use crate::suite_executor::TestSuiteExecutor;
     use crate::yaml_parser::TestSuite;
 
     const YAML_STR: &str =

@@ -5,7 +5,7 @@ use ctrlc;
 use indicatif::{ ProgressBar, ProgressStyle};
 
 use yaml_rust::{YamlLoader, Yaml};
-use gdf_testing::executor::TestSuiteExecutor;
+use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
 use gdf_testing::result_printer;

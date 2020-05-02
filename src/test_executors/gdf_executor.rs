@@ -19,7 +19,7 @@ use crate::gdf::{
     GDFCredentials
 };
 
-use crate::executor::TestExecutor;
+use crate::test_executors::TestExecutor;
 
 pub type HttpClient = reqwest::blocking::Client;
 
@@ -113,7 +113,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
     use crate::thread_pool::ThreadPool;
-    use crate::executor::TestSuiteExecutor;
+    use crate::suite_executor::TestSuiteExecutor;
     use crate::yaml_parser::TestSuite;    
     
     // cargo test -- --show-output test_process_test
