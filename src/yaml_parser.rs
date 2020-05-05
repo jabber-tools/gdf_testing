@@ -1,3 +1,4 @@
+use std::fmt;
 use yaml_rust::Yaml;
 use crate::errors::{Result, ErrorKind, new_error_from, Error};
 use std::collections::HashMap;
@@ -51,7 +52,7 @@ pub struct TestAssertion {
 pub enum TestAssertionResult {
     Ok(String), // contains NLP provider response
     KoIntentNameMismatch(Error), // error contains both error description and NLP provider response (see Error.backend_response)
-    KoResponseCheckError(Error)
+    KoResponseCheckError(Error, usize) // second parameter defines index of response check within vector or response checks for given assertion
 }
 
 impl Clone for TestAssertion {
@@ -85,11 +86,33 @@ pub enum TestAssertionResponseCheckOperator {
     Length
 }
 
+impl fmt::Display for TestAssertionResponseCheckOperator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TestAssertionResponseCheckOperator::Equals => write!(f, "="),
+            TestAssertionResponseCheckOperator::NotEquals => write!(f, "!="),
+            TestAssertionResponseCheckOperator::JsonEquals => write!(f, "<<json>>="),
+            TestAssertionResponseCheckOperator::Includes => write!(f, "includes"),
+            TestAssertionResponseCheckOperator::Length => write!(f, "length"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum TestAssertionResponseCheckValue {
     StrVal(String),
     NumVal(f64),
     BoolVal(bool),
+}
+
+impl fmt::Display for TestAssertionResponseCheckValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TestAssertionResponseCheckValue::StrVal(str_val) => write!(f, "{}", str_val),
+            TestAssertionResponseCheckValue::NumVal(num_val) => write!(f, "{}", num_val),
+            TestAssertionResponseCheckValue::BoolVal(bool_val) => write!(f, "{}",bool_val),
+        }
+    }
 }
 
 impl Clone for TestAssertionResponseCheckValue {
@@ -173,7 +196,7 @@ impl Test {
             if let Some(assertion_result) = &assertion.test_assertion_result {
                 match assertion_result {
                     TestAssertionResult::KoIntentNameMismatch(_) |
-                    TestAssertionResult::KoResponseCheckError(_) => return Some(assertion_result),
+                    TestAssertionResult::KoResponseCheckError(_, _) => return Some(assertion_result),
                     _  => {}, 
                 }
             }

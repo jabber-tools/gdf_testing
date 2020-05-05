@@ -182,7 +182,7 @@ fn main() {
         }
 
         let executed_test = recv_res.unwrap();
-        let (test_result_str, _) = StdoutResultReporter::get_test_result_str_and_msg(&executed_test);
+        let test_result_str= StdoutResultReporter::get_test_result_str(&executed_test);
         pb.println(format!("{} Finished test {} ({}/{})", test_result_str, executed_test.name, i + 1, test_count));
         pb.inc(1);    
         pb.set_message(&format!("Overall progress"));
@@ -192,5 +192,5 @@ fn main() {
     pb.finish_with_message("All tests executed!");
 
     println!("");
-    StdoutResultReporter::print_test_summary_table(&executed_tests);
+    StdoutResultReporter::report_test_results(&executed_tests);
 }

@@ -67,11 +67,11 @@ pub trait TestExecutor {
             // otherwise try to run assertion response checks
             let assertion_response = assertion_response.unwrap();
 
-            for response_check in &assertion_to_execute.response_checks {
+            for (idx, response_check) in assertion_to_execute.response_checks.iter().enumerate() {
                 let response_check_result = TestSuiteExecutor::process_assertion_response_check(response_check, &assertion_response);
     
                 if let Err(some_response_check_error) = response_check_result {
-                    self.set_test_assertion_result(TestAssertionResult::KoResponseCheckError(some_response_check_error));
+                    self.set_test_assertion_result(TestAssertionResult::KoResponseCheckError(some_response_check_error, idx));
                     self.set_test_result(TestResult::Ko);
                     self.move_behind_last_assertion();
                     let _ = self.send_test_results();

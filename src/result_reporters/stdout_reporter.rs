@@ -11,77 +11,183 @@ use crate::yaml_parser::{
 pub struct StdoutResultReporter;
 
 impl StdoutResultReporter {
-    pub fn get_test_result_str_and_msg(test: &Test) -> (String, Option<TestAssertionResult>) {
-        let ok_str = Green.paint("OK").to_string();
-        let ko_str = Red.paint("KO").to_string();
-        let unknown_str = Yellow.paint("??").to_string();
+
+    fn get_ok_str() -> String {
+      Green.paint("OK").to_string()
+    }
+
+    fn get_na_str() -> String {
+      Green.paint("N/A").to_string()
+    }
+
+    fn get_ko_str() -> String {
+      Red.paint("KO").to_string()
+    }
+
+    fn get_unknown_str() -> String {
+      Yellow.paint("??").to_string()
+    }
+
+    fn get_not_executed_str() -> String {
+      Yellow.paint("Not executed").to_string()
+    }
+
+
+    pub fn get_test_result_str(test: &Test) -> String {
       
-        let test_result_icon; 
-        let mut test_err_result: Option<TestAssertionResult> = None;
+        let test_result_str;
         if let Some(test_result) = &test.test_result {
           match test_result {
-            TestResult::Ok => {
-              test_result_icon = ok_str;
-              test_err_result = None;
-            },
-            _ => {
-              test_result_icon = ko_str;
-              let test_error_result = test.get_test_error().unwrap(); // quick and dirty ;)
-      
-              match test_error_result {
-                TestAssertionResult::KoIntentNameMismatch(_) |
-                TestAssertionResult::KoResponseCheckError(_) => {
-                  test_err_result = Some(test_error_result.clone());
-                },
-                _  => { /* this will never happen but Rust does not know that */ }             
-              }  
-            }
+            TestResult::Ok => test_result_str = StdoutResultReporter::get_ok_str(),
+            TestResult::Ko => test_result_str = StdoutResultReporter::get_ko_str()
           }
         } else {
-          test_result_icon = unknown_str; // this should never happen, but never say never :)
-          test_err_result = None;
+          test_result_str = StdoutResultReporter::get_unknown_str();
         }
     
-        (test_result_icon.to_string(), test_err_result)
-    }
-    
-    
-    pub fn print_test_summary_table(executed_tests: &Vec<Test>) {
-    
-      let mut table = Table::new();
-      table.add_row(row!["Test name", "Result", "Error message"]);
-    
-      for test in executed_tests {
-        let (test_result_str, test_err_result_unwraped) = StdoutResultReporter::get_test_result_str_and_msg(test);
-    
-        if let Some(test_err_result) = test_err_result_unwraped {
-          match test_err_result {
-            TestAssertionResult::KoIntentNameMismatch(err) => {
-              table.add_row(row![test.name, test_result_str, "Intent name mismatch:\n".to_owned() + &err.message]);
-            },
-            TestAssertionResult::KoResponseCheckError(err) => {
-              table.add_row(row![test.name, test_result_str, "Assertion post check error:\n".to_owned() + &err.message]);
-            },
-            TestAssertionResult::Ok(_) => { 
-              /* will not happen but rust does not know that */
-            }
-          }
-        } else {
-          table.add_row(row![test.name, test_result_str, ""]); 
-        }
-      } 
-      table.printstd();
+        test_result_str
     }
     
     pub fn report_test_results(tests: &Vec<Test>) {
-        // TBD
-        println!("{:?}", tests);
+        
+      let mut test_tables: Vec<Table> = vec![];
+
+      for test in tests {
+        let mut test_table = Table::new();
+        let test_result_str = StdoutResultReporter::get_test_result_str(test);
+
+        let test_result = test.get_test_error();
+
+        // add header row with test name status string (OK/KO) + potential error message (either intent name mismatch or assertion check error)
+        match test_result {
+          Some(some_test_result) => {
+            match some_test_result {
+              TestAssertionResult::KoIntentNameMismatch(err) => {
+                test_table.add_row(
+                  row![
+                    test.name.clone() + 
+                    " - " + 
+                    &test_result_str + "\n" + 
+                    &err.message
+                  ]
+                );
+              },
+              TestAssertionResult::KoResponseCheckError(err, _) => {
+                 test_table.add_row(
+                   row![
+                     test.name.clone() + 
+                     " - " + 
+                     &test_result_str + "\n" + 
+                     &err.message
+                   ]
+                 );
+              },
+              _ => { /* ok will not happen get_test_error is returning none in that case */}
+            }
+          }
+          None => { 
+            test_table.add_row(
+              row![test.name.clone() + " - " + &test_result_str]
+            );
+          }        
+      } // match test_result
+
+      // now add assertion table within second row of master table (test_table)
+      let mut test_table_assertions = Table::new();
+      test_table_assertions.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
+      for assertion in &test.assertions {
+
+        match assertion.test_assertion_result.as_ref().unwrap() /* assuming we always have result! */ {
+          TestAssertionResult::Ok(_) => {
+            test_table_assertions.add_row(
+              row![
+                assertion.user_says.clone(), 
+                assertion.bot_responds_with.join("\n"), 
+                StdoutResultReporter::get_ok_str(), 
+                match assertion.response_checks.len() {
+                  0 => StdoutResultReporter::get_na_str(),
+                  _ => StdoutResultReporter::get_ok_str()
+                }, 
+                "" // if everything is OK do not include backed response in std out report,
+                   // it will be collapsed in html report
+                   // TBD: other option is to make this configurable
+              ]
+            );
+          },
+          TestAssertionResult::KoIntentNameMismatch(err) => {
+            test_table_assertions.add_row(
+              row![
+                assertion.user_says.clone(), 
+                assertion.bot_responds_with.join("\n"), 
+                StdoutResultReporter::get_ko_str(), 
+                StdoutResultReporter::get_not_executed_str(),
+                err.backend_response.as_ref().unwrap() // TBD: make this configurable!
+              ]
+            );
+            break; // do not continue with any other assertion!
+          },
+          TestAssertionResult::KoResponseCheckError(err, assertion_check_idx) => {
+
+            let mut test_table_assertion_resp_checks = Table::new();
+            test_table_assertion_resp_checks.add_row(row!["Expression", "Operator", "Value", "Status"]);
+
+            for idx in 0..*assertion_check_idx + 1 {
+              let response_check = &assertion.response_checks[idx];
+
+              let res_str;
+              if idx == *assertion_check_idx {
+                res_str = StdoutResultReporter::get_ko_str()
+              } else {
+                res_str = StdoutResultReporter::get_ok_str()
+              }
+
+              test_table_assertion_resp_checks.add_row(
+                row![
+                  response_check.expression,
+                  response_check.operator,
+                  response_check.value,
+                  res_str
+                ]
+              );
+            }
+
+            test_table_assertions.add_row(
+              row![
+                assertion.user_says.clone(), 
+                assertion.bot_responds_with.join("\n"), 
+                StdoutResultReporter::get_ok_str(), 
+                test_table_assertion_resp_checks,
+                err.backend_response.as_ref().unwrap() // TBD: make this configurable!
+              ]
+
+            );
+            break; // do not continue with any other assertion!
+          },
+        }
+
+      } // for assertion in test.assertions
+      test_table.add_row(row![test_table_assertions]);
+      test_tables.push(test_table);      
+
+    } // for test in tests 
+
+    for table in test_tables {
+      table.printstd();
     }
-}
+
+  } // report_test_results 
+} // impl StdoutResultReporter
 
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  const JSON_FOO: &str =
+  r#"
+  {
+      "foo": "bar",
+  }
+  "#;    
 
   #[allow(dead_code)]
   const JSON: &str =
@@ -206,21 +312,21 @@ mod tests {
     table_assertion1.add_row(row!["Test assertions"]);
     table_assertion1.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
     table_assertion1.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str, "{'foo':'bar'}"]);
-    table_assertion1.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion1_postchecks, "{'foo':'bar'}"]);
+    table_assertion1.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion1_postchecks, JSON_FOO]);
 
     let mut table_assertion2 = Table::new();
     table_assertion2.add_row(row!["Test assertions"]);
     table_assertion2.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
-    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str,  "{'foo':'bar'}"]);
-    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ko_str, ne_str, "{'foo':'bar'}"]);
+    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str, JSON_FOO]);
+    table_assertion2.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ko_str, ne_str, JSON_FOO]);
 
 
     let mut table_assertion3 = Table::new();
     table_assertion3.add_row(row!["Test assertions"]);
     table_assertion3.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
-    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str,  "{'foo':'bar'}"]);
+    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str,  JSON_FOO]);
     // table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion2_postchecks, JSON]);
-    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion2_postchecks,  "{'foo':'bar'}"]);
+    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion2_postchecks, JSON_FOO]);
 
 
     let mut table_test1 = Table::new();
