@@ -8,66 +8,75 @@ use crate::yaml_parser::{
     TestAssertionResult, 
 };
 
-pub fn get_test_result_str_and_msg(test: &Test) -> (String, Option<TestAssertionResult>) {
-    let ok_str = Green.paint("OK").to_string();
-    let ko_str = Red.paint("KO").to_string();
-    let unknown_str = Yellow.paint("??").to_string();
-  
-    let test_result_icon; 
-    let mut test_err_result: Option<TestAssertionResult> = None;
-    if let Some(test_result) = &test.test_result {
-      match test_result {
-        TestResult::Ok => {
-          test_result_icon = ok_str;
-          test_err_result = None;
-        },
-        _ => {
-          test_result_icon = ko_str;
-          let test_error_result = test.get_test_error().unwrap(); // quick and dirty ;)
-  
-          match test_error_result {
-            TestAssertionResult::KoIntentNameMismatch(_) |
-            TestAssertionResult::KoResponseCheckError(_) => {
-              test_err_result = Some(test_error_result.clone());
+pub struct StdoutResultReporter;
+
+impl StdoutResultReporter {
+    pub fn get_test_result_str_and_msg(test: &Test) -> (String, Option<TestAssertionResult>) {
+        let ok_str = Green.paint("OK").to_string();
+        let ko_str = Red.paint("KO").to_string();
+        let unknown_str = Yellow.paint("??").to_string();
+      
+        let test_result_icon; 
+        let mut test_err_result: Option<TestAssertionResult> = None;
+        if let Some(test_result) = &test.test_result {
+          match test_result {
+            TestResult::Ok => {
+              test_result_icon = ok_str;
+              test_err_result = None;
             },
-            _  => { /* this will never happen but Rust does not know that */ }             
-          }  
+            _ => {
+              test_result_icon = ko_str;
+              let test_error_result = test.get_test_error().unwrap(); // quick and dirty ;)
+      
+              match test_error_result {
+                TestAssertionResult::KoIntentNameMismatch(_) |
+                TestAssertionResult::KoResponseCheckError(_) => {
+                  test_err_result = Some(test_error_result.clone());
+                },
+                _  => { /* this will never happen but Rust does not know that */ }             
+              }  
+            }
+          }
+        } else {
+          test_result_icon = unknown_str; // this should never happen, but never say never :)
+          test_err_result = None;
         }
-      }
-    } else {
-      test_result_icon = unknown_str; // this should never happen, but never say never :)
-      test_err_result = None;
+    
+        (test_result_icon.to_string(), test_err_result)
     }
-
-    (test_result_icon.to_string(), test_err_result)
-}
-
-
-pub fn print_test_summary_table(executed_tests: &Vec<Test>) {
-
-  let mut table = Table::new();
-  table.add_row(row!["Test name", "Result", "Error message"]);
-
-  for test in executed_tests {
-    let (test_result_str, test_err_result_unwraped) = get_test_result_str_and_msg(test);
-
-    if let Some(test_err_result) = test_err_result_unwraped {
-      match test_err_result {
-        TestAssertionResult::KoIntentNameMismatch(err) => {
-          table.add_row(row![test.name, test_result_str, "Intent name mismatch:\n".to_owned() + &err.message]);
-        },
-        TestAssertionResult::KoResponseCheckError(err) => {
-          table.add_row(row![test.name, test_result_str, "Assertion post check error:\n".to_owned() + &err.message]);
-        },
-        TestAssertionResult::Ok(_) => { 
-          /* will not happen but rust does not know that */
+    
+    
+    pub fn print_test_summary_table(executed_tests: &Vec<Test>) {
+    
+      let mut table = Table::new();
+      table.add_row(row!["Test name", "Result", "Error message"]);
+    
+      for test in executed_tests {
+        let (test_result_str, test_err_result_unwraped) = StdoutResultReporter::get_test_result_str_and_msg(test);
+    
+        if let Some(test_err_result) = test_err_result_unwraped {
+          match test_err_result {
+            TestAssertionResult::KoIntentNameMismatch(err) => {
+              table.add_row(row![test.name, test_result_str, "Intent name mismatch:\n".to_owned() + &err.message]);
+            },
+            TestAssertionResult::KoResponseCheckError(err) => {
+              table.add_row(row![test.name, test_result_str, "Assertion post check error:\n".to_owned() + &err.message]);
+            },
+            TestAssertionResult::Ok(_) => { 
+              /* will not happen but rust does not know that */
+            }
+          }
+        } else {
+          table.add_row(row![test.name, test_result_str, ""]); 
         }
-      }
-    } else {
-      table.add_row(row![test.name, test_result_str, ""]); 
+      } 
+      table.printstd();
     }
-  } 
-  table.printstd();
+    
+    pub fn report_test_results(tests: &Vec<Test>) {
+        // TBD
+        println!("{:?}", tests);
+    }
 }
 
 #[cfg(test)]
@@ -210,7 +219,8 @@ mod tests {
     table_assertion3.add_row(row!["Test assertions"]);
     table_assertion3.add_row(row!["Usar says", "Bot responds with", "Intent match status", "Assertion checks", "Raw response"]);
     table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, na_str,  "{'foo':'bar'}"]);
-    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion2_postchecks, JSON]);
+    // table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion2_postchecks, JSON]);
+    table_assertion3.add_row(row!["Hello", "Generic|BIT|0|Welcome|Gen", ok_str, table_assertion2_postchecks,  "{'foo':'bar'}"]);
 
 
     let mut table_test1 = Table::new();
@@ -237,4 +247,3 @@ mod tests {
 
   }
 }
-

@@ -8,7 +8,9 @@ use yaml_rust::{YamlLoader, Yaml};
 use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
-use gdf_testing::result_printer;
+use gdf_testing::result_reporters::{
+  StdoutResultReporter
+};
 
 fn main() {
         #[allow(dead_code)]
@@ -180,7 +182,7 @@ fn main() {
         }
 
         let executed_test = recv_res.unwrap();
-        let (test_result_str, _) = result_printer::get_test_result_str_and_msg(&executed_test);
+        let (test_result_str, _) = StdoutResultReporter::get_test_result_str_and_msg(&executed_test);
         pb.println(format!("{} Finished test {} ({}/{})", test_result_str, executed_test.name, i + 1, test_count));
         pb.inc(1);    
         pb.set_message(&format!("Overall progress"));
@@ -190,5 +192,5 @@ fn main() {
     pb.finish_with_message("All tests executed!");
 
     println!("");
-    result_printer::print_test_summary_table(&executed_tests);
+    StdoutResultReporter::print_test_summary_table(&executed_tests);
 }

@@ -5,4 +5,4 @@ pub mod errors;
 pub mod suite_executor;
 pub mod test_executors;
 pub mod thread_pool;
-pub mod result_printer;
+pub mod result_reporters;
