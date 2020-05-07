@@ -9,6 +9,7 @@ use yaml_rust::scanner::ScanError;
 use reqwest::header::InvalidHeaderValue;
 use std::sync::mpsc::SendError;
 use crate::yaml_parser::Test;
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -26,6 +27,11 @@ pub enum ErrorKind {
     InvalidTestAssertionEvaluation,
     InvalidTestAssertionResponseCheckEvaluation,
     ChannelSendError(SendError<Test>)
+}
+
+//default is required if we want to skip ErrorKind for serialization/deserialization, see #[serde(skip)] below
+impl Default for ErrorKind {
+    fn default() -> Self { ErrorKind::GenericError(String::from("N/A")) }
 }
 
 impl fmt::Display for ErrorKind {
@@ -49,8 +55,9 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Error {
+    #[serde(skip)]
     pub kind: Box<ErrorKind>,
     pub message: String,
     pub code: Option<String>,

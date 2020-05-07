@@ -2,7 +2,7 @@ use crate::yaml_parser::{
     Test,
     TestAssertionResult
 };
-use crate::errors::{Result};
+use crate::errors::Result;
 use std::fs::File;
 use std::path::Path;
 use std::io::Write;

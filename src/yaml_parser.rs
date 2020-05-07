@@ -2,6 +2,7 @@ use std::fmt;
 use yaml_rust::Yaml;
 use crate::errors::{Result, ErrorKind, new_error_from, Error};
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 
 fn yaml_error(message: String) -> Error {
     new_error_from(ErrorKind::YamlParsingError(message))
@@ -40,7 +41,7 @@ impl TestSuiteSpec {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TestAssertion {
     pub user_says: String,
     pub bot_responds_with: Vec<String>,
@@ -48,7 +49,7 @@ pub struct TestAssertion {
     pub test_assertion_result: Option<TestAssertionResult>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TestAssertionResult {
     Ok(String), // contains NLP provider response
     KoIntentNameMismatch(Error), // error contains both error description and NLP provider response (see Error.backend_response)
@@ -77,7 +78,7 @@ impl TestAssertion {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum TestAssertionResponseCheckOperator {
     Equals,
     NotEquals,
@@ -98,7 +99,7 @@ impl fmt::Display for TestAssertionResponseCheckOperator {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum TestAssertionResponseCheckValue {
     StrVal(String),
     NumVal(f64),
@@ -125,7 +126,7 @@ impl Clone for TestAssertionResponseCheckValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TestAssertionResponseCheck {
     pub expression: String,
     pub operator: TestAssertionResponseCheckOperator,
@@ -152,14 +153,14 @@ impl TestAssertionResponseCheck {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TestResult {
     Ok,
     Ko
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Test {
     pub name: String,
     pub desc: Option<String>,

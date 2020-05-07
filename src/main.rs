@@ -11,7 +11,8 @@ use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
 use gdf_testing::result_reporters::{
   StdoutResultReporter,
-  HtmlResultReporter
+  HtmlResultReporter,
+  JsonResultReporter
 };
 
 fn main() {
@@ -197,6 +198,6 @@ fn main() {
     StdoutResultReporter::report_test_results(&executed_tests);
     println!("");
     println!("");
-    println!("");
     let _ = HtmlResultReporter::report_test_results(&executed_tests, Path::new("/tmp/sample_report.html"));
+    let _ = JsonResultReporter::report_test_results(&executed_tests, Path::new("/tmp/sample_report.json"));
 }
