@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::Path;
 
 use ctrlc;
 use indicatif::{ ProgressBar, ProgressStyle};
@@ -9,7 +10,8 @@ use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
 use gdf_testing::result_reporters::{
-  StdoutResultReporter
+  StdoutResultReporter,
+  HtmlResultReporter
 };
 
 fn main() {
@@ -52,7 +54,7 @@ fn main() {
                       value: 'express_track'
                     - expression: 'queryResult.parameters.tracking_id'
                       operator: 'equals'
-                      value: '1234567891'
+                      value: '1234567891666'
             - name: 'Human transfer'
               desc: 'Initiation of human transfer'
               assertions:
@@ -193,4 +195,8 @@ fn main() {
 
     println!("");
     StdoutResultReporter::report_test_results(&executed_tests);
+    println!("");
+    println!("");
+    println!("");
+    let _ = HtmlResultReporter::report_test_results(&executed_tests, Path::new("/tmp/sample_report.html"));
 }
