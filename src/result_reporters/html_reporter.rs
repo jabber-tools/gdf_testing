@@ -180,7 +180,7 @@ impl HtmlResultReporter {
           
           let test_result = test.get_test_error();
   
-          // add header row with test name status string (OK/KO) + potential error message (either intent name mismatch or assertion check error)
+          // create header row for each test accordion element
           let mut test_header_html = String::new();
           match test_result {
             Some(some_test_result) => {
@@ -200,13 +200,12 @@ impl HtmlResultReporter {
             }        
         } // match test_result
   
-        // now add assertion table within second row of master table (test_table)
+        // now prepare assertion rows for final assertion table
         let mut test_table_assertions_html: Vec<String> = vec![];
         
         for (assertion_idx, assertion) in test.assertions.iter().enumerate() {
           match assertion.test_assertion_result.as_ref().unwrap() /* assuming we always have result! */ {
             TestAssertionResult::Ok(response) => {
-
 
                 let mut test_table_assertion_resp_checks:Vec<String> = vec![];
 
@@ -291,7 +290,7 @@ impl HtmlResultReporter {
         } // for assertion in test.assertions
         
         
-
+        // prepare Test error message (if any)
         let test_err_msg;
         match test_result {
             Some(some_test_result) => {
@@ -303,7 +302,6 @@ impl HtmlResultReporter {
             },
             None =>  {test_err_msg = String::from("");}
         }
-
 
         let test_table = TEST_RESULT_TABLE.to_string().replace("{__assertions__}", &test_table_assertions_html.join(""));
         let test_accordion = ACCORDION_ITEM.to_string()
