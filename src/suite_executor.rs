@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::mpsc;
 
 use crate::errors::{new_error, new_error_from, new_service_call_error, ErrorKind, Result};
@@ -47,12 +48,24 @@ impl<'a> TestSuiteExecutor<'a> {
                 }
                 let vap_svc_account_email = vap_svc_account_email.unwrap();
 
-                let vap_svc_account_password =
+                let vap_svc_account_password_from_env_var;
+                let mut vap_svc_account_password =
                     test_suite.suite_spec.config.get("vap_svc_account_password");
                 if let None = vap_svc_account_password {
-                    return Err(new_error_from(ErrorKind::GenericError(
-                        "vap_svc_account_password config value not found".to_owned(),
-                    )));
+                    // try to retrieve password from environment var before throwing error
+                    let svc_acc_pwd_env_var = env::var("VAP_SVC_ACCOUNT_PASSWORD");
+
+                    match svc_acc_pwd_env_var {
+                        Ok(env_var_val) => {
+                            vap_svc_account_password_from_env_var = env_var_val;
+                            vap_svc_account_password = Some(&vap_svc_account_password_from_env_var);
+                        }
+                        _ => {
+                            return Err(new_error_from(ErrorKind::GenericError(
+                                "vap_svc_account_password config value not found".to_owned(),
+                            )));
+                        }
+                    }
                 }
                 let vap_svc_account_password = vap_svc_account_password.unwrap();
 
