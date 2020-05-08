@@ -51,6 +51,13 @@ impl GDFDefaultTestExecutor {
             tx
         })
     }
+
+    fn make_pretty_json(response: String) -> Result<String>  {
+      let val_orig: serde_json::Value = serde_json::from_str(&response)?;
+      let changed_response = serde_json::to_string_pretty(&val_orig)?;
+      Ok(changed_response)
+    }    
+
 }
 
 impl TestExecutor for GDFDefaultTestExecutor {
@@ -89,6 +96,7 @@ impl TestExecutor for GDFDefaultTestExecutor {
 
         let payload = prepare_dialogflow_request(&assertion.user_says, &self.test.lang);
         let resp = call_dialogflow(payload, &self.cred.project_id, &self.conv_id, &self.http_client, &self.token.access_token)?;
+        let resp = GDFDefaultTestExecutor::make_pretty_json(resp)?; // GDF sends pretty jsons but just for any case let's prettify it anyway
         let parser = JsonParser::new(&resp);
         let real_intent_name = parser.search("queryResult.intent.displayName")?;
         let real_intent_name = JsonParser::extract_as_string(&real_intent_name);

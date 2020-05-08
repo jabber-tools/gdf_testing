@@ -73,7 +73,7 @@ fn remove_va_context_config(response: String) -> Result<String>  {
       });
       
     val_orig["vaContext"]["config"] = dummy_config;
-    let changed_response = serde_json::to_string(&val_orig)?;
+    let changed_response = serde_json::to_string_pretty(&val_orig)?;
 
     Ok(changed_response)
 }
