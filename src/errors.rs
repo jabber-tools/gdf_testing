@@ -1,15 +1,15 @@
-use std::error::Error as StdError;
+use crate::yaml_parser::Test;
 use jmespath::JmespathError;
+use jsonwebtoken;
+use reqwest;
+use reqwest::header::InvalidHeaderValue;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use std::error::Error as StdError;
 use std::fmt;
 use std::result;
-use serde_json;
-use reqwest;
-use jsonwebtoken;
-use yaml_rust::scanner::ScanError;
-use reqwest::header::InvalidHeaderValue;
 use std::sync::mpsc::SendError;
-use crate::yaml_parser::Test;
-use serde::{Serialize, Deserialize};
+use yaml_rust::scanner::ScanError;
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -26,12 +26,14 @@ pub enum ErrorKind {
     InvalidHeaderValueError(InvalidHeaderValue),
     InvalidTestAssertionEvaluation,
     InvalidTestAssertionResponseCheckEvaluation,
-    ChannelSendError(SendError<Test>)
+    ChannelSendError(SendError<Test>),
 }
 
 //default is required if we want to skip ErrorKind for serialization/deserialization, see #[serde(skip)] below
 impl Default for ErrorKind {
-    fn default() -> Self { ErrorKind::GenericError(String::from("N/A")) }
+    fn default() -> Self {
+        ErrorKind::GenericError(String::from("N/A"))
+    }
 }
 
 impl fmt::Display for ErrorKind {
@@ -48,8 +50,12 @@ impl fmt::Display for ErrorKind {
             ErrorKind::JWTCreation(_) => write!(f, "JWTCreation"),
             ErrorKind::GenericError(_) => write!(f, "GenericError"),
             ErrorKind::InvalidHeaderValueError(_) => write!(f, "InvalidHeaderValueError"),
-            ErrorKind::InvalidTestAssertionEvaluation => write!(f, "InvalidTestAssertionEvaluation"),
-            ErrorKind::InvalidTestAssertionResponseCheckEvaluation => write!(f, "InvalidTestAssertionResponseCheckEvaluation"),
+            ErrorKind::InvalidTestAssertionEvaluation => {
+                write!(f, "InvalidTestAssertionEvaluation")
+            }
+            ErrorKind::InvalidTestAssertionResponseCheckEvaluation => {
+                write!(f, "InvalidTestAssertionResponseCheckEvaluation")
+            }
             ErrorKind::ChannelSendError(_) => write!(f, "ChannelSendError"),
         }
     }
@@ -76,7 +82,7 @@ impl Clone for Error {
             kind: Box::new(ErrorKind::GenericError(String::from(""))),
             message: self.message.clone(),
             code: self.code.clone(),
-            backend_response: self.backend_response.clone()
+            backend_response: self.backend_response.clone(),
         }
     }
 }
@@ -90,8 +96,8 @@ pub(crate) fn new_error_from(kind: ErrorKind) -> Error {
         kind: Box::new(kind),
         message: message,
         code: None,
-        backend_response: None // used to capture Google DialogFlow or VAP response for final error report. 
-                               //User must see what went wrong while evaluating response from DialogFlow/VAP
+        backend_response: None, // used to capture Google DialogFlow or VAP response for final error report.
+                                //User must see what went wrong while evaluating response from DialogFlow/VAP
     }
 }
 
@@ -100,24 +106,37 @@ pub(crate) fn new_error(kind: ErrorKind, message: String, code: Option<String>) 
         kind: Box::new(kind),
         message,
         code,
-        backend_response: None
+        backend_response: None,
     }
 }
 
-pub(crate) fn new_service_call_error(kind: ErrorKind, message: String, code: Option<String>, backend_response: Option<String>) -> Error {
+pub(crate) fn new_service_call_error(
+    kind: ErrorKind,
+    message: String,
+    code: Option<String>,
+    backend_response: Option<String>,
+) -> Error {
     Error {
         kind: Box::new(kind),
         message,
         code,
-        backend_response
+        backend_response,
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.code {
-            Some(code) => write!(f, "Error occurred. Kind: {}, Code: {}, Message: {}", &self.kind, code, &self.message),
-            _ => write!(f, "Error occurred. Kind: {}, Code: N/A, Message: {}", &self.kind, &self.message)
+            Some(code) => write!(
+                f,
+                "Error occurred. Kind: {}, Code: {}, Message: {}",
+                &self.kind, code, &self.message
+            ),
+            _ => write!(
+                f,
+                "Error occurred. Kind: {}, Code: N/A, Message: {}",
+                &self.kind, &self.message
+            ),
         }
     }
 }
@@ -194,13 +213,13 @@ impl From<yaml_rust::scanner::ScanError> for Error {
 impl From<InvalidHeaderValue> for Error {
     fn from(error: InvalidHeaderValue) -> Error {
         new_error_from(ErrorKind::InvalidHeaderValueError(error))
-    }    
+    }
 }
 
 impl From<SendError<Test>> for Error {
     fn from(error: SendError<Test>) -> Error {
         new_error_from(ErrorKind::ChannelSendError(error))
-    }    
+    }
 }
 
 #[cfg(test)]
@@ -216,7 +235,12 @@ mod tests {
 
         assert_eq!(
             "Error occurred. Kind: GDFInvocationError, Code: ERR-001, Message: ooops",
-            new_error(ErrorKind::GDFInvocationError, "ooops".to_owned(), Some("ERR-001".to_owned())).to_string()
-        );        
+            new_error(
+                ErrorKind::GDFInvocationError,
+                "ooops".to_owned(),
+                Some("ERR-001".to_owned())
+            )
+            .to_string()
+        );
     }
 }

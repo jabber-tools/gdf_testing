@@ -1,8 +1,8 @@
-use std::thread;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
 
 // job is closure that consumes its environment -> FnOnce
 // jobs must be sendable to other thread -> Send
@@ -41,20 +41,17 @@ impl ThreadPool {
             workers.push(Worker::new(id, Arc::clone(&receiver), running.clone()));
         }
 
-        ThreadPool {
-            workers,
-            sender
-        }
+        ThreadPool { workers, sender }
     }
 
     // this method will be called for every test (respective closure)
     pub fn execute<F>(&self, f: F)
-        where
-            F: FnOnce() + Send + 'static
+    where
+        F: FnOnce() + Send + 'static,
     {
         let job = Box::new(f);
         self.sender.send(Message::NewJob(job)).unwrap();
-    }        
+    }
 }
 
 impl Drop for ThreadPool {
@@ -72,7 +69,9 @@ impl Drop for ThreadPool {
             println!("Shutting down worker {}", worker.id);
 
             // ... wait until the really do so!
-            if let Some(thread) = worker.thread.take() /* takes the value out of the option, leaving a None in its place. */ {
+            if let Some(thread) = worker.thread.take()
+            /* takes the value out of the option, leaving a None in its place. */
+            {
                 thread.join().unwrap();
             }
         }
@@ -85,19 +84,26 @@ struct Worker {
 }
 
 impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>, running: Arc<AtomicBool>) -> Worker {
+    fn new(
+        id: usize,
+        receiver: Arc<Mutex<mpsc::Receiver<Message>>>,
+        running: Arc<AtomicBool>,
+    ) -> Worker {
         let thread = thread::spawn(move || {
             loop {
                 // thread::sleep(std::time::Duration::from_millis(5000)); // just for debugging
 
-                //    
+                //
                 // receive mutex lock: lock()
                 // receive message from channel once available: recv()
                 //
                 let recv_res = receiver.lock().unwrap().recv();
-                
+
                 if let Err(_) = recv_res {
-                    println!("Sender for worker {} got disconnected, worker will terminate.", id);
+                    println!(
+                        "Sender for worker {} got disconnected, worker will terminate.",
+                        id
+                    );
                     break;
                 }
 
@@ -112,11 +118,14 @@ impl Worker {
                     Message::NewJob(job) => {
                         println!("Worker {} got a job; executing.", id);
                         job(); //this will do the job, i.e. execute dialog test
-                    },
+                    }
                     Message::Terminate => {
-                        println!("Worker {} was told to terminate since thread pool is terminating.", id);
+                        println!(
+                            "Worker {} was told to terminate since thread pool is terminating.",
+                            id
+                        );
                         break; // break the worker loop once asked to do so
-                    },
+                    }
                 }
             } // end loop
         });

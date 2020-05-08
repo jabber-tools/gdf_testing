@@ -1,23 +1,19 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use ctrlc;
-use indicatif::{ ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 
-use yaml_rust::{YamlLoader, Yaml};
+use gdf_testing::result_reporters::{HtmlResultReporter, JsonResultReporter, StdoutResultReporter};
 use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
-use gdf_testing::result_reporters::{
-  StdoutResultReporter,
-  HtmlResultReporter,
-  JsonResultReporter
-};
+use yaml_rust::{Yaml, YamlLoader};
 
 fn main() {
-        #[allow(dead_code)]
-        const YAML_STR_GDF: &str =
+    #[allow(dead_code)]
+    const YAML_STR_GDF: &str =
         "
         suite-spec:
             name: 'Dummy Tracking'
@@ -72,11 +68,10 @@ fn main() {
                     - expression: 'queryResult.allRequiredParamsPresent'
                       operator: 'equals'
                       value: true
-       ";         
+       ";
 
-       #[allow(dead_code)]
-       const YAML_STR_VAP: &str =
-       "
+    #[allow(dead_code)]
+    const YAML_STR_VAP: &str = "
        suite-spec:
            name: 'Dummy Tracking'
            type: 'DHLVAP'
@@ -133,11 +128,11 @@ fn main() {
                    - expression: 'dfResponse.queryResult.allRequiredParamsPresent'
                      operator: 'equals'
                      value: true
-      ";             
+      ";
 
     let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR_GDF).unwrap();
     let yaml: &Yaml = &docs[0];
-    let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
+    let suite: TestSuite = TestSuite::from_yaml(yaml).unwrap();
 
     let suite_executor = TestSuiteExecutor::new(suite).unwrap();
 
@@ -146,10 +141,9 @@ fn main() {
 
     let test_count = suite_executor.test_executors.len();
 
-    
     let sty = ProgressStyle::default_bar()
         .template("[{elapsed_precise}] {bar:70.yellow/red} {pos:>7}/{len:7} {msg}")
-        .progress_chars("##-");    
+        .progress_chars("##-");
 
     let pb = ProgressBar::new(test_count as u64);
     pb.set_style(sty);
@@ -157,39 +151,44 @@ fn main() {
     ctrlc::set_handler(move || {
         println!("CTRL+C detected!");
         running.store(false, Ordering::SeqCst);
-    }).expect("Error setting Ctrl-C handler");    
-
+    })
+    .expect("Error setting Ctrl-C handler");
 
     for mut test_executor in suite_executor.test_executors {
-        pool.execute(move || {
-            loop {
-                let assertion_exec_result = test_executor.execute_next_assertion();
-                if let None =  assertion_exec_result {
-                    break;
-                }
-            }             
+        pool.execute(move || loop {
+            let assertion_exec_result = test_executor.execute_next_assertion();
+            if let None = assertion_exec_result {
+                break;
+            }
         });
     }
 
     let mut executed_tests = vec![];
 
     println!("Runnint tests...");
-    // by common sense we should start at zero but there is probably some bug 
+    // by common sense we should start at zero but there is probably some bug
     // in indicatif library and it works properly only when we set it initually to 1
-    pb.set_position(1); 
-    for i in 0..test_count /*lower bound inclusive, upper bound exclusive!*/ { 
-
+    pb.set_position(1);
+    for i in 0..test_count
+    /*lower bound inclusive, upper bound exclusive!*/
+    {
         let recv_res = suite_executor.rx.recv();
 
         if let Err(_) = recv_res {
-          println!("test results receiving channel broken, terminating.");
-          break;
+            println!("test results receiving channel broken, terminating.");
+            break;
         }
 
         let executed_test = recv_res.unwrap();
-        let test_result_str= StdoutResultReporter::get_test_result_str(&executed_test);
-        pb.println(format!("{} Finished test {} ({}/{})", test_result_str, executed_test.name, i + 1, test_count));
-        pb.inc(1);    
+        let test_result_str = StdoutResultReporter::get_test_result_str(&executed_test);
+        pb.println(format!(
+            "{} Finished test {} ({}/{})",
+            test_result_str,
+            executed_test.name,
+            i + 1,
+            test_count
+        ));
+        pb.inc(1);
         pb.set_message(&format!("Overall progress"));
         executed_tests.push(executed_test);
         // std::thread::sleep(std::time::Duration::from_millis(5000)); // just for nice progress bar debugging! remove from final code!
@@ -200,6 +199,12 @@ fn main() {
     StdoutResultReporter::report_test_results(&executed_tests);
     println!("");
     println!("");
-    let _ = HtmlResultReporter::report_test_results(&executed_tests, Path::new("/tmp/sample_report.html"));
-    let _ = JsonResultReporter::report_test_results(&executed_tests, Path::new("/tmp/sample_report.json"));
+    let _ = HtmlResultReporter::report_test_results(
+        &executed_tests,
+        Path::new("/tmp/sample_report.html"),
+    );
+    let _ = JsonResultReporter::report_test_results(
+        &executed_tests,
+        Path::new("/tmp/sample_report.json"),
+    );
 }

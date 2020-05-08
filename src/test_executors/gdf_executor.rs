@@ -1,23 +1,14 @@
-use reqwest;
 use guid_create::GUID;
+use reqwest;
 use std::sync::mpsc;
 
-use crate::errors::{Result, ErrorKind, new_service_call_error};
-use crate::json_parser::JsonParser;
-use crate::yaml_parser::{
-    Test, 
-    TestResult,
-    TestAssertion, 
-    TestAssertionResult,
-};
+use crate::errors::{new_service_call_error, ErrorKind, Result};
 use crate::gdf::{
-    get_google_api_token, 
-    prepare_dialogflow_request,
-    call_dialogflow, 
-    file_to_gdf_credentials,
-    GoogleApisOauthToken,
-    GDFCredentials
+    call_dialogflow, file_to_gdf_credentials, get_google_api_token, prepare_dialogflow_request,
+    GDFCredentials, GoogleApisOauthToken,
 };
+use crate::json_parser::JsonParser;
+use crate::yaml_parser::{Test, TestAssertion, TestAssertionResult, TestResult};
 
 use crate::test_executors::TestExecutor;
 
@@ -30,12 +21,11 @@ pub struct GDFDefaultTestExecutor {
     token: GoogleApisOauthToken,
     conv_id: String,
     cred: GDFCredentials,
-    tx: mpsc::Sender<Test>
+    tx: mpsc::Sender<Test>,
 }
 
 impl GDFDefaultTestExecutor {
     pub fn new(credentials_file: String, test: Test, tx: mpsc::Sender<Test>) -> Result<Self> {
-
         let http_client = HttpClient::new();
         let token = get_google_api_token(&credentials_file, &http_client)?;
         let conv_id = GUID::rand().to_string();
@@ -48,24 +38,22 @@ impl GDFDefaultTestExecutor {
             token: token,
             conv_id: conv_id,
             cred: cred,
-            tx
+            tx,
         })
     }
 
-    fn make_pretty_json(response: String) -> Result<String>  {
-      let val_orig: serde_json::Value = serde_json::from_str(&response)?;
-      let changed_response = serde_json::to_string_pretty(&val_orig)?;
-      Ok(changed_response)
-    }    
-
+    fn make_pretty_json(response: String) -> Result<String> {
+        let val_orig: serde_json::Value = serde_json::from_str(&response)?;
+        let changed_response = serde_json::to_string_pretty(&val_orig)?;
+        Ok(changed_response)
+    }
 }
 
 impl TestExecutor for GDFDefaultTestExecutor {
-
     fn move_to_next_assertion(&mut self) {
         self.next_assertion = self.next_assertion + 1;
     }
-    
+
     fn move_behind_last_assertion(&mut self) {
         self.next_assertion = self.get_assertions().len() + 1;
     }
@@ -93,22 +81,47 @@ impl TestExecutor for GDFDefaultTestExecutor {
     }
 
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
-
         let payload = prepare_dialogflow_request(&assertion.user_says, &self.test.lang);
-        let resp = call_dialogflow(payload, &self.cred.project_id, &self.conv_id, &self.http_client, &self.token.access_token)?;
+        let resp = call_dialogflow(
+            payload,
+            &self.cred.project_id,
+            &self.conv_id,
+            &self.http_client,
+            &self.token.access_token,
+        )?;
         let resp = GDFDefaultTestExecutor::make_pretty_json(resp)?; // GDF sends pretty jsons but just for any case let's prettify it anyway
         let parser = JsonParser::new(&resp);
         let real_intent_name = parser.search("queryResult.intent.displayName")?;
         let real_intent_name = JsonParser::extract_as_string(&real_intent_name);
-    
+
         if let Some(intent_name) = real_intent_name {
-            if !assertion.bot_responds_with.contains(&intent_name.to_string()) {
-                let error_message = format!("Wrong intent name received. Expected one of: '{}', got: '{}'", assertion.bot_responds_with.join(","), intent_name);
-                return Err(new_service_call_error(ErrorKind::InvalidTestAssertionEvaluation, error_message, None, Some(resp.to_owned())));
+            if !assertion
+                .bot_responds_with
+                .contains(&intent_name.to_string())
+            {
+                let error_message = format!(
+                    "Wrong intent name received. Expected one of: '{}', got: '{}'",
+                    assertion.bot_responds_with.join(","),
+                    intent_name
+                );
+                return Err(new_service_call_error(
+                    ErrorKind::InvalidTestAssertionEvaluation,
+                    error_message,
+                    None,
+                    Some(resp.to_owned()),
+                ));
             }
         } else {
-            let error_message = format!("No intent name received. Expected: '{}'", assertion.bot_responds_with.join(","));
-            return Err(new_service_call_error(ErrorKind::InvalidTestAssertionEvaluation, error_message, None, Some(resp.to_owned())));
+            let error_message = format!(
+                "No intent name received. Expected: '{}'",
+                assertion.bot_responds_with.join(",")
+            );
+            return Err(new_service_call_error(
+                ErrorKind::InvalidTestAssertionEvaluation,
+                error_message,
+                None,
+                Some(resp.to_owned()),
+            ));
         }
         Ok(resp)
     }
@@ -117,18 +130,17 @@ impl TestExecutor for GDFDefaultTestExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yaml_rust::{YamlLoader, Yaml};
-    use std::sync::Arc;
-    use std::sync::atomic::AtomicBool;
-    use crate::thread_pool::ThreadPool;
     use crate::suite_executor::TestSuiteExecutor;
-    use crate::yaml_parser::TestSuite;    
-    
+    use crate::thread_pool::ThreadPool;
+    use crate::yaml_parser::TestSuite;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+    use yaml_rust::{Yaml, YamlLoader};
+
     // cargo test -- --show-output test_process_test
     #[test]
     #[ignore]
     fn test_process_test() -> Result<()> {
-
         const YAML_STR: &str =
         "
         suite-spec:
@@ -157,12 +169,12 @@ mod tests {
                     - expression: 'queryResult.parameters.tracking_id'
                       operator: 'equals'
                       value: '1234567891'
-       ";           
+       ";
 
         let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
         let yaml: &Yaml = &docs[0];
-        let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
-    
+        let suite: TestSuite = TestSuite::from_yaml(yaml).unwrap();
+
         let mut suite_executor = TestSuiteExecutor::new(suite)?;
         let test1_executor = &mut suite_executor.test_executors[0];
 
@@ -181,23 +193,21 @@ mod tests {
             print!("Saying {}", user_says);
             let assertion_exec_result = test1_executor.execute_next_assertion();
 
-            if let Some(_) =  assertion_exec_result {
+            if let Some(_) = assertion_exec_result {
                 print!(" - ok!");
             } else {
                 print!(" - ko!");
                 break;
             }
-        }        
+        }
 
         Ok(())
-    }     
-    
-    
+    }
+
     // cargo test -- --show-output test_process_multiple_tests
     #[test]
     #[ignore]
     fn test_process_multiple_tests() -> Result<()> {
-
         const YAML_STR: &str =
         "
         suite-spec:
@@ -237,12 +247,12 @@ mod tests {
                     - expression: 'queryResult.parameters.tracking_id'
                       operator: 'equals'
                       value: '1234567891'
-       ";           
+       ";
 
         let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR).unwrap();
         let yaml: &Yaml = &docs[0];
-        let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
-    
+        let suite: TestSuite = TestSuite::from_yaml(yaml).unwrap();
+
         let suite_executor = TestSuiteExecutor::new(suite)?;
 
         let running = Arc::new(AtomicBool::new(true));
@@ -254,10 +264,10 @@ mod tests {
             pool.execute(move || {
                 loop {
                     let assertion_exec_result = test_executor.execute_next_assertion();
-                    if let None =  assertion_exec_result {
+                    if let None = assertion_exec_result {
                         break;
                     }
-                }             
+                }
                 println!("pool.execute closure done");
             });
         }
@@ -269,7 +279,5 @@ mod tests {
         }
 
         Ok(())
-    }       
-
+    }
 }
-    
