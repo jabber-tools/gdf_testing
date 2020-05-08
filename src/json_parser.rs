@@ -506,6 +506,41 @@ mod tests {
         }
       }      
     }
+
+    #[test]
+    fn test_change_json() -> Result<()> {
+      let orig = r#"
+      {
+        "foo": "bar",
+        "bar": {
+          "foobar": "barfoo"
+        }
+      }"#;
+
+      let mut val_orig: serde_json::Value = from_str(orig)?;
+
+      let val_inserted = json!({
+        "a": "adam was here",
+        "b": 666
+      });
+
+      val_orig["bar"] = val_inserted;
+
+
+      let value_expected = r#"
+      {
+        "foo": "bar",
+        "bar": {
+          "a": "adam was here",
+          "b": 666
+        }
+      }
+      "#;
+
+      assert_json_eq!(val_orig, from_str(value_expected).unwrap());
+
+      Ok(())
+    }
 }
 
 

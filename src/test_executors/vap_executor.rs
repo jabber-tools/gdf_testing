@@ -1,4 +1,5 @@
 use serde::{Serialize, Deserialize};
+use serde_json::json;
 use guid_create::GUID;
 use std::sync::mpsc;
 
@@ -62,6 +63,19 @@ fn call_vap (payload: String, http_client: &HttpClient, bearer: &str, vap_url: &
     let vap_url = format!("{}/vapapi/channels/generic/v1",vap_url);
     let resp = http_client.post(&vap_url).body(payload).headers(headers).send()?.text()?;
     Ok(resp)
+}
+
+fn remove_va_context_config(response: String) -> Result<String>  {
+    let mut val_orig: serde_json::Value = serde_json::from_str(&response)?;
+
+    let dummy_config = json!({
+        "note": "config removed for security reasons"
+      });
+      
+    val_orig["vaContext"]["config"] = dummy_config;
+    let changed_response = serde_json::to_string(&val_orig)?;
+
+    Ok(changed_response)
 }
 
 pub struct VAPTestExecutor {
@@ -170,6 +184,7 @@ impl TestExecutor for VAPTestExecutor {
 
         let payload = prepare_vap_request(&self.vap_access_token, &assertion.user_says, &self.conv_id, &self.test.lang);
         let resp = call_vap(payload, &self.http_client, &self.jwt_token, &self.vap_url)?;
+        let resp = remove_va_context_config(resp)?; // remove vaContext.config since it contains sensitive data
         let parser = JsonParser::new(&resp);
         let real_intent_name = parser.search("dfResponse.queryResult.intent.displayName")?;
         let real_intent_name = JsonParser::extract_as_string(&real_intent_name);
