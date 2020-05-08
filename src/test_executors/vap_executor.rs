@@ -36,7 +36,7 @@ pub struct VapAuthenticationResponse {
     pub user: VapAuthenticationResponseUser
 }
 
-fn prepare_vap_request(vap_access_token: &str, utterance: &str, conv_id: &str) -> String {
+fn prepare_vap_request(vap_access_token: &str, utterance: &str, conv_id: &str, lang: &str) -> String {
     // so far we do not support neither vaContext dynamic enhancement nor development identity
     format!(r#"{{
         "headers": {{
@@ -46,8 +46,11 @@ fn prepare_vap_request(vap_access_token: &str, utterance: &str, conv_id: &str) -
         "body": {{
             "text": "{_utterance_}",
             "convId": "{_conv_id_}"
+        }},
+        "vaContext": {{
+            "lang": "{_lang_}"
         }}
-    }}"#, _access_token_ = vap_access_token, _utterance_ = utterance, _conv_id_ = conv_id)
+    }}"#, _access_token_ = vap_access_token, _utterance_ = utterance, _conv_id_ = conv_id, _lang_ = lang)
 }
 
 fn call_vap (payload: String, http_client: &HttpClient, bearer: &str, vap_url: &str) -> Result<String> {
@@ -165,7 +168,7 @@ impl TestExecutor for VAPTestExecutor {
 
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
 
-        let payload = prepare_vap_request(&self.vap_access_token, &assertion.user_says, &self.conv_id);
+        let payload = prepare_vap_request(&self.vap_access_token, &assertion.user_says, &self.conv_id, &self.test.lang);
         let resp = call_vap(payload, &self.http_client, &self.jwt_token, &self.vap_url)?;
         let parser = JsonParser::new(&resp);
         let real_intent_name = parser.search("dfResponse.queryResult.intent.displayName")?;

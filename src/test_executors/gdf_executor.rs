@@ -87,7 +87,7 @@ impl TestExecutor for GDFDefaultTestExecutor {
 
     fn invoke_nlp(&self, assertion: &TestAssertion) -> Result<String> {
 
-        let payload = prepare_dialogflow_request(&assertion.user_says);
+        let payload = prepare_dialogflow_request(&assertion.user_says, &self.test.lang);
         let resp = call_dialogflow(payload, &self.cred.project_id, &self.conv_id, &self.http_client, &self.token.access_token)?;
         let parser = JsonParser::new(&resp);
         let real_intent_name = parser.search("queryResult.intent.displayName")?;

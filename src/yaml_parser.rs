@@ -164,6 +164,7 @@ pub enum TestResult {
 pub struct Test {
     pub name: String,
     pub desc: Option<String>,
+    pub lang: String,
     pub assertions: Vec<TestAssertion>,
     pub execution_id: Option<usize>,
     pub test_result: Option<TestResult>,
@@ -174,6 +175,7 @@ impl Clone for Test {
         Test {
             name: self.name.clone(),
             desc: self.desc.clone(),
+            lang: self.lang.clone(),
             assertions: self.assertions.clone(),
             execution_id: self.execution_id.clone(),
             test_result: self.test_result.clone()
@@ -182,10 +184,11 @@ impl Clone for Test {
 }
     
 impl Test {
-    pub fn new(name: String, desc: Option<String>) -> Test {
+    pub fn new(name: String, desc: Option<String>, lang: String) -> Test {
         Test {
-            name: name,
-            desc: desc,
+            name,
+            desc,
+            lang,
             assertions: vec![],
             execution_id: None,
             test_result: None
@@ -350,15 +353,23 @@ impl TestSuite {
 
             let test_name = test["name"].as_str();
             let test_desc = test["desc"].as_str(); //desc is optional
+            let test_lang = test["lang"].as_str(); //lang is optional, if not specified defaults to 'en'
             let test_assertions: Option<&Vec<Yaml>> = test["assertions"].as_vec();
             if let None = test_name {return Err(yaml_error(format!("Test name not specified")));}
                 
             let mut test_to_push;
 
-            if let None = test_desc {
-                test_to_push = Test::new(test_name.unwrap().to_string(), None);
+            let lang_code;
+            if let None = test_lang { 
+                lang_code = String::from("en");
             } else {
-                test_to_push = Test::new(test_name.unwrap().to_string(), Some(test_desc.unwrap().to_string()));
+                lang_code = test_lang.unwrap().to_string();
+            }
+
+            if let None = test_desc {
+                test_to_push = Test::new(test_name.unwrap().to_string(), None, lang_code);
+            } else {
+                test_to_push = Test::new(test_name.unwrap().to_string(), Some(test_desc.unwrap().to_string()), lang_code);
             }
 
             
@@ -447,7 +458,7 @@ mod tests {
         let assertion1 = TestAssertion::new("Hi".to_string(), vec!["Welcome".to_string(),"Welcome2".to_string()], vec![]);
         let assertion2 = TestAssertion::new("whats up?".to_string(), vec!["Smalltalk|Whats up".to_string()], vec![]);
         
-        let mut test1 = Test::new("Test1".to_string(), None);
+        let mut test1 = Test::new("Test1".to_string(), None, "en".to_owned());
         test1.assertions = vec![assertion1, assertion2];
         
         let mut config_map = HashMap::new();

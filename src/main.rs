@@ -27,6 +27,7 @@ fn main() {
         tests:
             - name: 'Hello - track'
               desc: 'Simple initial two turn tracking dialog'
+              lang: 'en'
               assertions:
                 - userSays: 'Hello'
                   botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
@@ -55,7 +56,7 @@ fn main() {
                       value: 'express_track'
                     - expression: 'queryResult.parameters.tracking_id'
                       operator: 'equals'
-                      value: '1234567891666'
+                      value: '1234567891'
             - name: 'Human transfer'
               desc: 'Initiation of human transfer'
               assertions:
@@ -87,6 +88,7 @@ fn main() {
        tests:
            - name: 'Hello - track'
              desc: 'Simple initial two turn tracking dialog'
+             lang: 'es'
              assertions:
                - userSays: 'Hello'
                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
@@ -108,7 +110,7 @@ fn main() {
                      operator: 'equals'
                      value: true
                - userSays: 'it is 1234567891'
-                 botRespondsWith: ['Tracking|CS|3|ID valid|Gen']
+                 botRespondsWith: ['Tracking|CS|4|Found OK|Gen']
                  responseChecks:
                    - expression: 'dfResponse.queryResult.action'
                      operator: 'equals'
@@ -120,7 +122,7 @@ fn main() {
              desc: 'Initiation of human transfer'
              assertions:
                - userSays: 'talk to representative'
-                 botRespondsWith: 'Representative|CS|0|User request|TPh'
+                 botRespondsWith: 'Representative|CS|0|User request|Gen'
                  responseChecks:
                    - expression: 'dfResponse.queryResult.action'
                      operator: 'equals'
@@ -133,7 +135,7 @@ fn main() {
                      value: true
       ";             
 
-    let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR_GDF).unwrap();
+    let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR_VAP).unwrap();
     let yaml: &Yaml = &docs[0];
     let suite: TestSuite =  TestSuite::from_yaml(yaml).unwrap();    
 

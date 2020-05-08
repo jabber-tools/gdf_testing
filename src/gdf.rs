@@ -127,16 +127,16 @@ pub fn call_dialogflow (payload: String, project_id: &str, conv_id: &str, http_c
     Ok(resp)
 }
 
-pub fn prepare_dialogflow_request(utterance: &str) -> String {
+pub fn prepare_dialogflow_request(utterance: &str, lang: &str) -> String {
     format!(r#"{{
         queryParams: {{}},
         queryInput: {{
           text: {{
             text: "{gdf_utterance}",
-            languageCode: 'en'
+            languageCode: '{gdf_lang}'
           }}
         }}
-      }}"#, gdf_utterance=utterance)
+      }}"#, gdf_utterance=utterance, gdf_lang=lang)
 }
 
 #[cfg(test)]
@@ -210,7 +210,7 @@ mod tests {
 
         let conv_id = "16f308bc-8006-4e35-81a6-3a12653188c1";
         
-        let resp = call_dialogflow (prepare_dialogflow_request("Hi"), &cred.project_id, conv_id, &client, &google_apis_token.access_token)?;
+        let resp = call_dialogflow (prepare_dialogflow_request("Hi", "en"), &cred.project_id, conv_id, &client, &google_apis_token.access_token)?;
 
         println!("{}", resp);
         Ok(())        
