@@ -1,7 +1,7 @@
 use std::path::Path;
+use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::process;
 
 use ctrlc;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -11,7 +11,6 @@ use gdf_testing::result_reporters::{HtmlResultReporter, JsonResultReporter, Stdo
 use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
-
 
 fn main() {
     #[allow(dead_code)]
@@ -137,8 +136,11 @@ fn main() {
     // read the yaml file from string
     let docs = YamlLoader::load_from_str(YAML_STR_GDF);
     if let Err(some_err) = docs {
-      println!("Error while reading yaml test suite definition file, terminating. Error detail: {}", some_err);
-      process::exit(1);
+        println!(
+            "Error while reading yaml test suite definition file, terminating. Error detail: {}",
+            some_err
+        );
+        process::exit(1);
     }
     let docs: Vec<Yaml> = docs.unwrap();
     let yaml: &Yaml = &docs[0];
@@ -146,16 +148,22 @@ fn main() {
     //parse yaml string and convert it to test suite struct
     let suite = TestSuite::from_yaml(yaml);
     if let Err(some_err) = suite {
-      println!("Error while parsing yaml test suite definition file, terminating. Error detail: {}", some_err);
-      process::exit(1);
+        println!(
+            "Error while parsing yaml test suite definition file, terminating. Error detail: {}",
+            some_err
+        );
+        process::exit(1);
     }
     let suite: TestSuite = suite.unwrap();
 
     // create test suite executor and underlying test executor jobs
     let suite_executor = TestSuiteExecutor::new(suite);
     if let Err(some_err) = suite_executor {
-      println!("Error while initiating the tests, terminating. Error detail: {}", some_err);
-      process::exit(1);
+        println!(
+            "Error while initiating the tests, terminating. Error detail: {}",
+            some_err
+        );
+        process::exit(1);
     }
     let suite_executor = suite_executor.unwrap();
 
@@ -210,8 +218,11 @@ fn main() {
         let executed_test = recv_res;
 
         if let Err(some_err) = executed_test {
-          println!("Error while running the tests, terminating. Error detail: {}", some_err);
-          process::exit(1);
+            println!(
+                "Error while running the tests, terminating. Error detail: {}",
+                some_err
+            );
+            process::exit(1);
         }
 
         let executed_test = executed_test.unwrap();

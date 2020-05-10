@@ -49,7 +49,9 @@ impl fmt::Display for ErrorKind {
             ErrorKind::JsonSerDeser(err) => write!(f, "JsonSerDeser: {}", err),
             ErrorKind::JWTCreation(err) => write!(f, "JWTCreation: {}", err),
             ErrorKind::GenericError(err) => write!(f, "GenericError: {}", err),
-            ErrorKind::InvalidHeaderValueError(err) => write!(f, "InvalidHeaderValueError: {}", err),
+            ErrorKind::InvalidHeaderValueError(err) => {
+                write!(f, "InvalidHeaderValueError: {}", err)
+            }
             ErrorKind::InvalidTestAssertionEvaluation => {
                 write!(f, "InvalidTestAssertionEvaluation")
             }
