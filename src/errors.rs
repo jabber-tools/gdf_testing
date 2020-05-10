@@ -41,15 +41,15 @@ impl fmt::Display for ErrorKind {
         match &self {
             ErrorKind::GDFTokenRetrievalError => write!(f, "GDFTokenRetrievalError"),
             ErrorKind::GDFInvocationError => write!(f, "GDFInvocationError"),
-            ErrorKind::HttpInvocationError(_) => write!(f, "HttpInvocationError"),
-            ErrorKind::YamlParsingError(_) => write!(f, "YamlParsingError"),
-            ErrorKind::YamlLoadingError(_) => write!(f, "YamlLoadingError"),
-            ErrorKind::JsonParsingError(_) => write!(f, "JsonParsingError"),
-            ErrorKind::IOError(_) => write!(f, "IOError"),
-            ErrorKind::JsonSerDeser(_) => write!(f, "JsonSerDeser"),
-            ErrorKind::JWTCreation(_) => write!(f, "JWTCreation"),
-            ErrorKind::GenericError(_) => write!(f, "GenericError"),
-            ErrorKind::InvalidHeaderValueError(_) => write!(f, "InvalidHeaderValueError"),
+            ErrorKind::HttpInvocationError(err) => write!(f, "HttpInvocationError: {}", err),
+            ErrorKind::YamlParsingError(err) => write!(f, "YamlParsingError: {}", err),
+            ErrorKind::YamlLoadingError(err) => write!(f, "YamlLoadingError: {}", err),
+            ErrorKind::JsonParsingError(err) => write!(f, "JsonParsingError: {}", err),
+            ErrorKind::IOError(err) => write!(f, "IOError: {}", err),
+            ErrorKind::JsonSerDeser(err) => write!(f, "JsonSerDeser: {}", err),
+            ErrorKind::JWTCreation(err) => write!(f, "JWTCreation: {}", err),
+            ErrorKind::GenericError(err) => write!(f, "GenericError: {}", err),
+            ErrorKind::InvalidHeaderValueError(err) => write!(f, "InvalidHeaderValueError: {}", err),
             ErrorKind::InvalidTestAssertionEvaluation => {
                 write!(f, "InvalidTestAssertionEvaluation")
             }

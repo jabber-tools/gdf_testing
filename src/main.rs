@@ -1,15 +1,17 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::process;
 
 use ctrlc;
 use indicatif::{ProgressBar, ProgressStyle};
+use yaml_rust::{Yaml, YamlLoader};
 
 use gdf_testing::result_reporters::{HtmlResultReporter, JsonResultReporter, StdoutResultReporter};
 use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
-use yaml_rust::{Yaml, YamlLoader};
+
 
 fn main() {
     #[allow(dead_code)]
@@ -132,17 +134,37 @@ fn main() {
 
     env_logger::init();
 
-    let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR_GDF).unwrap();
+    // read the yaml file from string
+    let docs = YamlLoader::load_from_str(YAML_STR_GDF);
+    if let Err(some_err) = docs {
+      println!("Error while reading yaml test suite definition file, terminating. Error detail: {}", some_err);
+      process::exit(1);
+    }
+    let docs: Vec<Yaml> = docs.unwrap();
     let yaml: &Yaml = &docs[0];
-    let suite: TestSuite = TestSuite::from_yaml(yaml).unwrap();
 
-    let suite_executor = TestSuiteExecutor::new(suite).unwrap();
+    //parse yaml string and convert it to test suite struct
+    let suite = TestSuite::from_yaml(yaml);
+    if let Err(some_err) = suite {
+      println!("Error while parsing yaml test suite definition file, terminating. Error detail: {}", some_err);
+      process::exit(1);
+    }
+    let suite: TestSuite = suite.unwrap();
 
+    // create test suite executor and underlying test executor jobs
+    let suite_executor = TestSuiteExecutor::new(suite);
+    if let Err(some_err) = suite_executor {
+      println!("Error while initiating the tests, terminating. Error detail: {}", some_err);
+      process::exit(1);
+    }
+    let suite_executor = suite_executor.unwrap();
+
+    // initiate thread pool for processing of test executor jobs
     let running = Arc::new(AtomicBool::new(true));
     let pool = ThreadPool::new(4, running.clone()); // TBD: make thread pool size configurable
 
+    // initiate prohress bar for displaying execution progress
     let test_count = suite_executor.test_executors.len();
-
     let sty = ProgressStyle::default_bar()
         .template("[{elapsed_precise}] {bar:70.yellow/red} {pos:>7}/{len:7} {msg}")
         .progress_chars("##-");
@@ -150,12 +172,14 @@ fn main() {
     let pb = ProgressBar::new(test_count as u64);
     pb.set_style(sty);
 
+    // setup CTRL+C handler
     ctrlc::set_handler(move || {
         println!("CTRL+C detected!");
         running.store(false, Ordering::SeqCst);
     })
     .expect("Error setting Ctrl-C handler");
 
+    // kick off execution of all test executor jobs by thread pool
     for mut test_executor in suite_executor.test_executors {
         pool.execute(move || loop {
             let assertion_exec_result = test_executor.execute_next_assertion();
@@ -165,6 +189,8 @@ fn main() {
         });
     }
 
+    // executed test with results will be returned by threadpool
+    // via mpsc channel and gathered in this vector
     let mut executed_tests = vec![];
 
     println!("Runnint tests...");
@@ -178,10 +204,17 @@ fn main() {
 
         if let Err(_) = recv_res {
             println!("test results receiving channel broken, terminating.");
-            break;
+            process::exit(1);
         }
 
-        let executed_test = recv_res.unwrap();
+        let executed_test = recv_res;
+
+        if let Err(some_err) = executed_test {
+          println!("Error while running the tests, terminating. Error detail: {}", some_err);
+          process::exit(1);
+        }
+
+        let executed_test = executed_test.unwrap();
         let test_result_str = StdoutResultReporter::get_test_result_str(&executed_test);
         pb.println(format!(
             "{} Finished test {} ({}/{})",
