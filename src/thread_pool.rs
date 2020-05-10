@@ -1,3 +1,4 @@
+use log::debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -56,17 +57,17 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        println!("Sending terminate message to all workers.");
+        debug!("Sending terminate message to all workers.");
 
         // ask to workers to terminate ...
         for _ in &mut self.workers {
             self.sender.send(Message::Terminate).unwrap();
         }
 
-        println!("Shutting down all workers.");
+        debug!("Shutting down all workers.");
 
         for worker in &mut self.workers {
-            println!("Shutting down worker {}", worker.id);
+            debug!("Shutting down worker {}", worker.id);
 
             // ... wait until the really do so!
             if let Some(thread) = worker.thread.take()
@@ -100,7 +101,7 @@ impl Worker {
                 let recv_res = receiver.lock().unwrap().recv();
 
                 if let Err(_) = recv_res {
-                    println!(
+                    debug!(
                         "Sender for worker {} got disconnected, worker will terminate.",
                         id
                     );
@@ -110,17 +111,17 @@ impl Worker {
                 let message = recv_res.unwrap();
 
                 if running.load(Ordering::SeqCst) == false {
-                    println!("Worker {} was told to terminate (ctrl+c pressed).", id);
+                    debug!("Worker {} was told to terminate (ctrl+c pressed).", id);
                     break; // break the worker loop once asked to do so
                 }
 
                 match message {
                     Message::NewJob(job) => {
-                        println!("Worker {} got a job; executing.", id);
+                        debug!("Worker {} got a job; executing.", id);
                         job(); //this will do the job, i.e. execute dialog test
                     }
                     Message::Terminate => {
-                        println!(
+                        debug!(
                             "Worker {} was told to terminate since thread pool is terminating.",
                             id
                         );

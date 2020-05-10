@@ -130,6 +130,8 @@ fn main() {
                      value: true
       ";
 
+    env_logger::init();
+
     let docs: Vec<Yaml> = YamlLoader::load_from_str(YAML_STR_GDF).unwrap();
     let yaml: &Yaml = &docs[0];
     let suite: TestSuite = TestSuite::from_yaml(yaml).unwrap();

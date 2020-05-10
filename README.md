@@ -4,4 +4,4 @@ Command line tool for automated testing of chatbots powered by Google DialogFlow
 
 ## TBD
 
-TBD
+set RUST_LOG=gdf_testing::thread_pool=debug

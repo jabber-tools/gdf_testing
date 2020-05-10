@@ -536,7 +536,6 @@ mod tests {
             ),
             Err(err) => match *err.kind {
                 ErrorKind::GenericError(err_msg) => {
-                    println!("hey");
                     assert!(
                         err_msg
                             .contains("GenericError: EOF while parsing a value at line 1 column 0"),
