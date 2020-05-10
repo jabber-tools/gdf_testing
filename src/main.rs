@@ -7,11 +7,11 @@ use ctrlc;
 use indicatif::{ProgressBar, ProgressStyle};
 use yaml_rust::{Yaml, YamlLoader};
 
+use gdf_testing::cmdl_parser::{check_cmdl_matches, get_cmd_line_parser};
 use gdf_testing::result_reporters::{HtmlResultReporter, JsonResultReporter, StdoutResultReporter};
 use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
-use gdf_testing::cmdl_parser::{get_cmd_line_parser, check_cmdl_matches};
 
 fn main() {
     #[allow(dead_code)]
