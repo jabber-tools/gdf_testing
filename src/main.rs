@@ -7,7 +7,7 @@ use ctrlc;
 use indicatif::{ProgressBar, ProgressStyle};
 use yaml_rust::{Yaml, YamlLoader};
 
-use gdf_testing::cmdl_parser::{check_cmdl_matches, get_cmd_line_parser};
+use gdf_testing::cmdl_parser::{get_cmd_line_parser, get_cmdl_options};
 use gdf_testing::result_reporters::{HtmlResultReporter, JsonResultReporter, StdoutResultReporter};
 use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
@@ -133,8 +133,7 @@ fn main() {
       ";
 
     env_logger::init();
-    let cmdl_matches = get_cmd_line_parser().get_matches();
-    let _ = check_cmdl_matches(&cmdl_matches);
+    let _cmd_line_opts = get_cmdl_options(&get_cmd_line_parser().get_matches());
 
     // read the yaml file from string
     let docs = YamlLoader::load_from_str(YAML_STR_GDF);
