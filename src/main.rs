@@ -11,6 +11,7 @@ use gdf_testing::result_reporters::{HtmlResultReporter, JsonResultReporter, Stdo
 use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
+use gdf_testing::cmdl_parser::{get_cmd_line_parser, check_cmdl_matches};
 
 fn main() {
     #[allow(dead_code)]
@@ -132,6 +133,8 @@ fn main() {
       ";
 
     env_logger::init();
+    let cmdl_matches = get_cmd_line_parser().get_matches();
+    let _ = check_cmdl_matches(&cmdl_matches);
 
     // read the yaml file from string
     let docs = YamlLoader::load_from_str(YAML_STR_GDF);
