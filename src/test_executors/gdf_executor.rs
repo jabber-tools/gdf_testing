@@ -1,4 +1,5 @@
 use guid_create::GUID;
+use log::debug;
 use reqwest;
 use std::sync::mpsc;
 
@@ -25,8 +26,27 @@ pub struct GDFDefaultTestExecutor {
 }
 
 impl GDFDefaultTestExecutor {
-    pub fn new(credentials_file: String, test: Test, tx: mpsc::Sender<Test>) -> Result<Self> {
-        let http_client = HttpClient::new();
+    pub fn new(
+        credentials_file: String,
+        test: Test,
+        tx: mpsc::Sender<Test>,
+        http_proxy: Option<String>,
+    ) -> Result<Self> {
+        let http_client;
+
+        match http_proxy {
+            Some(proxy) => {
+                debug!("building http client with proxy {}", proxy);
+                http_client = HttpClient::builder()
+                    .proxy(reqwest::Proxy::http(&proxy)?)
+                    .build()?;
+            }
+            _ => {
+                debug!("building http client with no proxy");
+                http_client = HttpClient::new()
+            }
+        }
+
         let token = get_google_api_token(&credentials_file, &http_client)?;
         let conv_id = GUID::rand().to_string();
         let cred = file_to_gdf_credentials(&credentials_file)?;
@@ -34,10 +54,10 @@ impl GDFDefaultTestExecutor {
         Ok(GDFDefaultTestExecutor {
             test,
             next_assertion: 0,
-            http_client: http_client,
-            token: token,
-            conv_id: conv_id,
-            cred: cred,
+            http_client,
+            token,
+            conv_id,
+            cred,
             tx,
         })
     }

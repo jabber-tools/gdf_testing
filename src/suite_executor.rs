@@ -101,11 +101,19 @@ impl<'a> TestSuiteExecutor<'a> {
 
                 for (idx, test) in test_suite.tests.iter().enumerate() {
                     let mut _test = test.clone();
+
+                    let http_proxy: Option<String>;
+                    match test_suite.suite_spec.config.get("http_proxy") {
+                        Some(proxy_str) => http_proxy = Some(proxy_str.to_owned()),
+                        _ => http_proxy = None,
+                    }
+
                     _test.execution_id = Some(idx);
                     let _executor = Box::new(GDFDefaultTestExecutor::new(
                         credentials_file.to_owned(),
                         _test,
                         tx.clone(),
+                        http_proxy,
                     )?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }
