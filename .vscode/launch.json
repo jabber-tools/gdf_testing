@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch gdf-testing",
+            "name": "Launch gdf-testing (gdf)",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceRoot}/target/debug/gdf_testing.exe",
@@ -14,8 +14,23 @@
             "environment": [],
             "externalConsole": false,
             "args": [
-                "--foo",
-                "--bar"
+                "--suite-file",
+                "c:/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/sample_gdf.yaml"
+            ]
+        },
+        {
+            "name": "Launch gdf-testing (vap)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/gdf_testing.exe",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "args": [
+                "--suite-file",
+                "c:/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/sample_vap.yaml",
+                "--disable-stdout-report"
             ]
         },
         {

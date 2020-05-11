@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::fs;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -13,133 +13,30 @@ use gdf_testing::suite_executor::TestSuiteExecutor;
 use gdf_testing::thread_pool::ThreadPool;
 use gdf_testing::yaml_parser::TestSuite;
 
+// cargo run -- --suite-file c:/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/sample_vap.yaml
+// cargo run -- --suite-file c:/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/sample_gdf.yaml
+// cargo run -- --suite-file c:/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/sample_vap.yaml --disable-stdout-report --html-report c:/tmp/report.html --json-report c:/tmp/report.json
 fn main() {
-    #[allow(dead_code)]
-    const YAML_STR_GDF: &str =
-        "
-        suite-spec:
-            name: 'Dummy Tracking'
-            type: 'DialogFlow'
-            config: 
-              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials-cs-am-uat.json'
-        tests:
-            - name: 'Hello - track'
-              desc: 'Simple initial two turn tracking dialog'
-              lang: 'en'
-              assertions:
-                - userSays: 'Hello'
-                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
-                - userSays: 'track a package'
-                  botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
-                  responseChecks:
-                    - expression: 'queryResult.allRequiredParamsPresent'
-                      operator: 'equals'
-                      value: true
-            - name: 'Hello - track - entity parsing'
-              desc: 'Very similar second test'
-              assertions:
-                - userSays: 'Hi'
-                  botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
-                - userSays: 'track a package please'
-                  botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
-                  responseChecks:
-                    - expression: 'queryResult.allRequiredParamsPresent'
-                      operator: 'equals'
-                      value: true
-                - userSays: 'it is 1234567891'
-                  botRespondsWith: ['Tracking|CS|3|ID valid|Gen']
-                  responseChecks:
-                    - expression: 'queryResult.action'
-                      operator: 'equals'
-                      value: 'express_track'
-                    - expression: 'queryResult.parameters.tracking_id'
-                      operator: 'equals'
-                      value: '1234567891'
-            - name: 'Human transfer'
-              desc: 'Initiation of human transfer'
-              assertions:
-                - userSays: 'talk to representative'
-                  botRespondsWith: 'Representative|CS|0|User request|TPh'
-                  responseChecks:
-                    - expression: 'queryResult.action'
-                      operator: 'equals'
-                      value: 'country_specific_response'                      
-                    - expression: 'queryResult.parameters.event'
-                      operator: 'equals'
-                      value: 'repr_user_request'  
-                    - expression: 'queryResult.allRequiredParamsPresent'
-                      operator: 'equals'
-                      value: true
-       ";
-
-    #[allow(dead_code)]
-    const YAML_STR_VAP: &str = "
-       suite-spec:
-           name: 'Dummy Tracking'
-           type: 'DHLVAP'
-           config: 
-             - vap_url: 'https://vap-dev.prg-dc.dhl.com:7070'
-             - vap_access_token: '00b2018c-1a78-415c-8999-0852d503b1f3'
-             - vap_svc_account_email: 'dummy-cs@iam.vap.dhl.com'
-             - vap_svc_account_password: 'dummyPassword123'
-       tests:
-           - name: 'Hello - track'
-             desc: 'Simple initial two turn tracking dialog'
-             lang: 'es'
-             assertions:
-               - userSays: 'Hello'
-                 botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
-               - userSays: 'track a package'
-                 botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
-                 responseChecks:
-                   - expression: 'dfResponse.queryResult.allRequiredParamsPresent'
-                     operator: 'equals'
-                     value: true
-           - name: 'Hello - track - entity parsing'
-             desc: 'Very similar second test'
-             assertions:
-               - userSays: 'Hi'
-                 botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
-               - userSays: 'track a package please'
-                 botRespondsWith: ['Tracking|CS|0|Prompt|Gen']
-                 responseChecks:
-                   - expression: 'dfResponse.queryResult.allRequiredParamsPresent'
-                     operator: 'equals'
-                     value: true
-               - userSays: 'it is 1234567891'
-                 botRespondsWith: ['Tracking|CS|4|Found OK|Gen']
-                 responseChecks:
-                   - expression: 'dfResponse.queryResult.action'
-                     operator: 'equals'
-                     value: 'express_track'
-                   - expression: 'dfResponse.queryResult.parameters.tracking_id'
-                     operator: 'equals'
-                     value: '1234567891'
-           - name: 'Human transfer'
-             desc: 'Initiation of human transfer'
-             assertions:
-               - userSays: 'talk to representative'
-                 botRespondsWith: 'Representative|CS|0|User request|Gen'
-                 responseChecks:
-                   - expression: 'dfResponse.queryResult.action'
-                     operator: 'equals'
-                     value: 'country_specific_response'                      
-                   - expression: 'dfResponse.queryResult.parameters.event'
-                     operator: 'equals'
-                     value: 'repr_user_request'  
-                   - expression: 'dfResponse.queryResult.allRequiredParamsPresent'
-                     operator: 'equals'
-                     value: true
-      ";
-
     env_logger::init();
-    let _cmd_line_opts = get_cmdl_options(&get_cmd_line_parser().get_matches());
+    let cmd_line_matches = get_cmd_line_parser().get_matches();
+    let cmd_line_opts = get_cmdl_options(&cmd_line_matches);
 
-    // read the yaml file from string
-    let docs = YamlLoader::load_from_str(YAML_STR_GDF);
-    if let Err(some_err) = docs {
+    let test_suite_path = *cmd_line_opts.test_suite_file;
+    let yaml_str = fs::read_to_string(test_suite_path);
+    if let Err(some_err) = yaml_str {
         println!(
             "Error while reading yaml test suite definition file, terminating. Error detail: {}",
+            some_err
+        );
+        process::exit(1);
+    }
+    let yaml_str = yaml_str.unwrap();
+
+    // read the yaml file from string
+    let docs = YamlLoader::load_from_str(&yaml_str);
+    if let Err(some_err) = docs {
+        println!(
+            "Error while loading yaml test suite definition file, terminating. Error detail: {}",
             some_err
         );
         process::exit(1);
@@ -243,16 +140,34 @@ fn main() {
     }
     pb.finish_with_message("All tests executed!");
 
-    println!("");
-    StdoutResultReporter::report_test_results(&executed_tests);
-    println!("");
-    println!("");
-    let _ = HtmlResultReporter::report_test_results(
-        &executed_tests,
-        Path::new("/tmp/sample_report.html"),
-    );
-    let _ = JsonResultReporter::report_test_results(
-        &executed_tests,
-        Path::new("/tmp/sample_report.json"),
-    );
+    let print_to_std_out = cmd_line_opts.print_to_std_out;
+    if print_to_std_out == true {
+        println!("");
+        StdoutResultReporter::report_test_results(&executed_tests);
+        println!("");
+    }
+
+    let html_report_path = cmd_line_opts.html_report_path;
+    if let Some(html_path) = html_report_path {
+        let result = HtmlResultReporter::report_test_results(&executed_tests, *html_path);
+        if let Err(some_error) = result {
+            println!(
+                "Error while generating html report. Error detail: {}",
+                some_error
+            );
+            process::exit(1);
+        }
+    }
+
+    let json_report_path = cmd_line_opts.json_report_path;
+    if let Some(json_path) = json_report_path {
+        let result = JsonResultReporter::report_test_results(&executed_tests, *json_path);
+        if let Err(some_error) = result {
+            println!(
+                "Error while generating json report. Error detail: {}",
+                some_error
+            );
+            process::exit(1);
+        }
+    }
 }

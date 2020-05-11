@@ -32,7 +32,7 @@ pub fn get_cmd_line_parser<'a, 'b>() -> App<'a, 'b> {
                 .value_name("FILE")
                 .help("Yaml file with test suite definition")
                 .takes_value(true)
-                .required(false), // TBD: this will be required soon!
+                .required(true),
         )
         .arg(
             Arg::with_name("html_report")
@@ -67,7 +67,7 @@ pub fn get_cmdl_options<'a>(matches: &'a ArgMatches) -> CommandLine<'a> {
         // this will never hapen since clap will not allow to get here without suite file
         // but we need to implement this to fool compiler, otherwise it will be complaining about error:
         // use of possibly-uninitialized `command_line`
-        println!("suite file not specified, terminating.");
+        debug!("suite file not specified, terminating.");
         std::process::exit(1);
     }
 
@@ -81,7 +81,7 @@ pub fn get_cmdl_options<'a>(matches: &'a ArgMatches) -> CommandLine<'a> {
         command_line.json_report_path = Some(Box::new(Path::new(file)));
     }
 
-    if let Some(_) = matches.value_of("surpress_stdout_report") {
+    if matches.is_present("surpress_stdout_report") {
         debug!("Standard output report will be surpressed.");
         command_line.print_to_std_out = false;
     }
