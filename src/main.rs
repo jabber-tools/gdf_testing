@@ -68,7 +68,7 @@ fn main() {
 
     // initiate thread pool for processing of test executor jobs
     let running = Arc::new(AtomicBool::new(true));
-    let pool = ThreadPool::new(4, running.clone()); // TBD: make thread pool size configurable
+    let pool = ThreadPool::new(cmd_line_opts.threadpool_size, running.clone());
 
     // initiate prohress bar for displaying execution progress
     let test_count = suite_executor.test_executors.len();

@@ -7,6 +7,7 @@ pub struct CommandLine<'a> {
     pub print_to_std_out: bool,
     pub html_report_path: Option<Box<&'a Path>>,
     pub json_report_path: Option<Box<&'a Path>>,
+    pub threadpool_size: usize,
 }
 
 impl<'a> CommandLine<'a> {
@@ -16,6 +17,7 @@ impl<'a> CommandLine<'a> {
             print_to_std_out: true,
             html_report_path: None,
             json_report_path: None,
+            threadpool_size: 4,
         };
     }
 }
@@ -32,7 +34,7 @@ pub fn get_cmd_line_parser<'a, 'b>() -> App<'a, 'b> {
                 .value_name("FILE")
                 .help("Yaml file with test suite definition")
                 .takes_value(true)
-                .required(true),
+                .required(true)
         )
         .arg(
             Arg::with_name("html_report")
@@ -40,7 +42,7 @@ pub fn get_cmd_line_parser<'a, 'b>() -> App<'a, 'b> {
                 .value_name("FILE")
                 .help("Path to optional html report")
                 .takes_value(true)
-                .required(false),
+                .required(false)
         )
         .arg(
             Arg::with_name("json_report")
@@ -48,13 +50,22 @@ pub fn get_cmd_line_parser<'a, 'b>() -> App<'a, 'b> {
                 .value_name("FILE")
                 .help("Path to optional json report")
                 .takes_value(true)
-                .required(false),
+                .required(false)
         )
         .arg(
             Arg::with_name("surpress_stdout_report")
                 .long("disable-stdout-report")
                 .help("Disables default report printed to standard output")
-                .required(false),
+                .required(false)
+        )
+        .arg(
+            Arg::with_name("threadpool_size")
+                .short("t")
+                .long("threadpool-size")
+                .value_name("INTEGER")
+                .help("Number of worker threads for parallel test execution. If not specified defaults to 4.")
+                .takes_value(true)
+                .default_value("4")
         )
 }
 
@@ -85,6 +96,14 @@ pub fn get_cmdl_options<'a>(matches: &'a ArgMatches) -> CommandLine<'a> {
         debug!("Standard output report will be surpressed.");
         command_line.print_to_std_out = false;
     }
+
+    // safe to unwrap, clap provides default value
+    command_line.threadpool_size = matches
+        .value_of("threadpool_size")
+        .unwrap()
+        .to_owned()
+        .parse::<usize>()
+        .unwrap();
 
     command_line
 }
