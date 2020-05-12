@@ -73,6 +73,16 @@ impl<'a> TestSuiteExecutor<'a> {
                     let mut _test = test.clone();
                     _test.execution_id = Some(idx);
 
+                    let vap_channel_id = match test_suite.suite_spec.config.get("vap_channel_id") {
+                        None => None,
+                        Some(channel_id) => Some(channel_id.to_owned()),
+                    };
+
+                    let vap_country = match test_suite.suite_spec.config.get("vap_country") {
+                        None => None,
+                        Some(country) => Some(country.to_owned()),
+                    };
+
                     let _executor = Box::new(VAPTestExecutor::new(
                         vap_access_token.to_owned(),
                         vap_url.to_owned(),
@@ -80,6 +90,8 @@ impl<'a> TestSuiteExecutor<'a> {
                         vap_svc_account_password.to_owned(),
                         _test,
                         tx.clone(),
+                        vap_channel_id,
+                        vap_country,
                     )?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }

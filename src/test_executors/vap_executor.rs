@@ -1,4 +1,5 @@
 use guid_create::GUID;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::mpsc;
@@ -37,9 +38,30 @@ fn prepare_vap_request(
     utterance: &str,
     conv_id: &str,
     lang: &str,
+    vap_channel_id: &Option<String>,
+    vap_country: &Option<String>,
 ) -> String {
+    let vap_channel_id_str = match vap_channel_id {
+        None => "".to_string(),
+        Some(channel) => format!(
+            r#"
+            ,"channelId": "{_vap_channel_id_}"
+            "#,
+            _vap_channel_id_ = channel
+        ),
+    };
+    let vap_country_str = match vap_country {
+        None => "".to_string(),
+        Some(country) => format!(
+            r#"
+            ,"country": "{_vap_country_}"
+            "#,
+            _vap_country_ = country
+        ),
+    };
+
     // so far we do not support neither vaContext dynamic enhancement nor development identity
-    format!(
+    let vap_request = format!(
         r#"{{
         "headers": {{
             "at": "{_access_token_}",
@@ -51,13 +73,20 @@ fn prepare_vap_request(
         }},
         "vaContext": {{
             "lang": "{_lang_}"
+            {_vap_channel_id_}
+            {_vap_country_}
         }}
     }}"#,
         _access_token_ = vap_access_token,
         _utterance_ = utterance,
         _conv_id_ = conv_id,
-        _lang_ = lang
-    )
+        _lang_ = lang,
+        _vap_channel_id_ = vap_channel_id_str,
+        _vap_country_ = vap_country_str
+    );
+
+    debug!("vap_request={}", vap_request);
+    vap_request
 }
 
 fn call_vap(
@@ -106,6 +135,8 @@ pub struct VAPTestExecutor {
     conv_id: String,
     jwt_token: String,
     tx: mpsc::Sender<Test>,
+    vap_channel_id: Option<String>,
+    vap_country: Option<String>,
 }
 
 impl VAPTestExecutor {
@@ -116,6 +147,8 @@ impl VAPTestExecutor {
         vap_svc_account_password: String,
         test: Test,
         tx: mpsc::Sender<Test>,
+        vap_channel_id: Option<String>,
+        vap_country: Option<String>,
     ) -> Result<Self> {
         let http_client = HttpClient::new();
         let conv_id = GUID::rand().to_string();
@@ -136,6 +169,8 @@ impl VAPTestExecutor {
             conv_id,
             jwt_token,
             tx,
+            vap_channel_id,
+            vap_country,
         })
     }
 
@@ -230,6 +265,8 @@ impl TestExecutor for VAPTestExecutor {
             &assertion.user_says,
             &self.conv_id,
             &self.test.lang,
+            &self.vap_channel_id,
+            &self.vap_country,
         );
         let resp = call_vap(payload, &self.http_client, &self.jwt_token, &self.vap_url)?;
         let resp = remove_va_context_config(resp)?; // remove vaContext.config since it contains sensitive data
@@ -371,6 +408,8 @@ mod tests {
                 .to_owned(),
             suite.tests[0].clone(),
             tx,
+            None,
+            None,
         )
         .unwrap();
 
