@@ -100,7 +100,7 @@ fn main() {
     // via mpsc channel and gathered in this vector
     let mut executed_tests = vec![];
 
-    println!("Runnint tests...");
+    println!("Running tests...");
     // by common sense we should start at zero but there is probably some bug
     // in indicatif library and it works properly only when we set it initually to 1
     pb.set_position(1);
