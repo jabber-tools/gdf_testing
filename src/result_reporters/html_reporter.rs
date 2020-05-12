@@ -262,7 +262,7 @@ impl HtmlResultReporter {
               let assertion_html = ASSERTION_ROW.to_string()
               .replace("{__user_says__}", &assertion.user_says)
               .replace("{__bot_responds_with__}", &assertion.bot_responds_with.join("</br>"))
-              .replace("{__intent_name_match_status__}", KO_SVG)
+              .replace("{__intent_name_match_status__}", OK_SVG)
               .replace("{__assertion_checks_table__}", &ASSERTION_CHECK_TABLE.to_string().replace("{__rows__}", &test_table_assertion_resp_checks.join("")))
               .replace("{__test_id__}", &test_idx.to_string())
               .replace("{__assertion_id__}", &assertion_idx.to_string())
@@ -314,7 +314,8 @@ impl HtmlResultReporter {
 
         let html_report = MASTER_CONTAINER
             .to_string()
-            .replace("{__report_body__}", &test_tables.join(""));
+            .replace("{__report_body__}", &test_tables.join(""))
+            .replace("<<json>>=", "&lt;&lt;json&gt;&gt;="); // use html entities for json equals operator to display it properly in html
 
         let mut file = File::create(file_path)?;
         file.write_all(html_report.as_bytes())?;

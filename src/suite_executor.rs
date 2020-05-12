@@ -731,7 +731,9 @@ mod tests {
         "queryResult": {
           "queryText": "hi",
           "action": "input.welcome",
-          "parameters": {},
+          "parameters": {
+              "dummyParam": "123456"
+          },
           "allRequiredParamsPresent": true,
           "fulfillmentText": "Hi, this is Dummy Express, your specialist in international shipping.",
           "fulfillmentMessages": [
@@ -1080,6 +1082,19 @@ mod tests {
             "#.to_string())
         );
 
+        let check_ok_2: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
+            "queryResult.parameters".to_string(),
+            TestAssertionResponseCheckOperator::JsonEquals,
+            TestAssertionResponseCheckValue::StrVal(
+                r#"
+                {
+                    "dummyParam": "123456"
+                }
+            "#
+                .to_string(),
+            ),
+        );
+
         let check_ko_1: TestAssertionResponseCheck = TestAssertionResponseCheck::new(
             "queryResult.outputContexts[0]".to_string(), 
             TestAssertionResponseCheckOperator::JsonEquals,
@@ -1099,6 +1114,11 @@ mod tests {
 
         assert_eq!(
             TestSuiteExecutor::process_assertion_response_check(&check_ok, JSON).unwrap(),
+            ()
+        );
+
+        assert_eq!(
+            TestSuiteExecutor::process_assertion_response_check(&check_ok_2, JSON).unwrap(),
             ()
         );
 

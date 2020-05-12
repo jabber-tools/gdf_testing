@@ -1173,9 +1173,12 @@ mod tests {
             TestAssertionResponseCheckValue::StrVal(str_val) => {
                 let parser = JsonParser::new(&str_val);
 
-                // TBD: we need to find way how search/jmespath can access whole json
+                // it would be nice to find way how search/jmespath can access whole json
                 // if not possible real implementation must wrap the content by stuff placeholder implicitly
                 // so that users don't have to do it
+                //
+                // reality is user will never use json equals operator for whole document returned from dialogflow/vap
+                // hence current implementation is sufficient see suite_executor.rs, test test_process_assertion_response_check_str_json_equals_objects
                 let search_result = parser.search("stuff").unwrap();
                 let value_real = JsonParser::extract_as_object(&search_result);
 

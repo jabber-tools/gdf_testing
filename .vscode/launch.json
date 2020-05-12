@@ -37,7 +37,7 @@
             "name": "Launch gdf-testing - unit tests",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/target/debug/gdf_testing-e028a6ad7731eb42.exe",
+            "program": "${workspaceRoot}/target/debug/gdf_testing-88b4993cab1777e5.exe",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

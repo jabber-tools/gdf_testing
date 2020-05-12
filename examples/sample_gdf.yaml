@@ -36,6 +36,12 @@ tests:
             - expression: 'queryResult.parameters.tracking_id'
               operator: 'equals'
               value: '1234567891'
+            - expression: 'queryResult.parameters'
+              operator: 'jsonequals'
+              value: | 
+                {
+                    "tracking_id": "1234567891"
+                }
     - name: 'Human transfer'
       desc: 'Initiation of human transfer'
       assertions:
