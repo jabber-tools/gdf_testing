@@ -76,7 +76,7 @@ impl StdoutResultReporter {
             // now add assertion table within second row of master table (test_table)
             let mut test_table_assertions = Table::new();
             test_table_assertions.add_row(row![
-                "Usar says",
+                "User says",
                 "Bot responds with",
                 "Intent match status",
                 "Assertion checks",
@@ -319,7 +319,7 @@ mod tests {
         let mut table_assertion1 = Table::new();
         table_assertion1.add_row(row!["Test assertions"]);
         table_assertion1.add_row(row![
-            "Usar says",
+            "User says",
             "Bot responds with",
             "Intent match status",
             "Assertion checks",
@@ -343,7 +343,7 @@ mod tests {
         let mut table_assertion2 = Table::new();
         table_assertion2.add_row(row!["Test assertions"]);
         table_assertion2.add_row(row![
-            "Usar says",
+            "User says",
             "Bot responds with",
             "Intent match status",
             "Assertion checks",
@@ -367,7 +367,7 @@ mod tests {
         let mut table_assertion3 = Table::new();
         table_assertion3.add_row(row!["Test assertions"]);
         table_assertion3.add_row(row![
-            "Usar says",
+            "User says",
             "Bot responds with",
             "Intent match status",
             "Assertion checks",
