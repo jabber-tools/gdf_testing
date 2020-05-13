@@ -1,0 +1,68 @@
+# gdf_testing.exe --suite-file c:/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/complex_sample_2.yaml
+suite-spec:
+    name: 'Dummy Tracking'
+    type: 'DHLVAP'
+    config: 
+      - vap_url: 'https://vap-dev.prg-dc.dhl.com:7070'
+      - vap_access_token: '00b2018c-1a78-415c-8999-0852d503b1f3'
+      - vap_svc_account_email: 'dummy-cs@iam.vap.dhl.com'
+      - vap_svc_account_password: 'dummyPassword123'
+tests:
+    - name: 'tracking + representative'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+        - userSays: 'track a package'
+          botRespondsWith: 'Tracking|CS|0|Prompt|Gen'
+        - userSays: 'it is 1234567891'
+          botRespondsWith: 'Tracking|CS|4|Found OK|Gen'
+        - userSays: 'representative'
+          # country not provided in this new conversation -> prompt
+          botRespondsWith: 'Representative|CS|1|User request Country Prompt|Gen'
+        - userSays: 'I am in India'
+          # currently bot does provide country specific response for US only (if CC is open -> Representative|CS|3|CC open|US)
+          # since we are in India we get generic answer
+          botRespondsWith: ['Representative|CS|3|CC open|Gen', 'Representative|CS|3|CC closed|Gen']
+        - userSays: 'wrong country'
+          botRespondsWith: 'Representative|CS|4|Change country|Gen'
+        - userSays: 'I am in USA'
+          # country specific intent if CC is open, otherwise same generic intent!
+          botRespondsWith: ['Representative|CS|3|CC open|US', 'Representative|CS|3|CC closed|Gen']
+
+    - name: 'tracking + representative + repeat opening hours'
+      desc: 'repeating opening hours makes sense on voice channel when user might easily miss it and needs to repeat it again'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+        - userSays: 'track a package'
+          botRespondsWith: 'Tracking|CS|0|Prompt|Gen'
+        - userSays: 'it is 1234567891'
+          botRespondsWith: 'Tracking|CS|4|Found OK|Gen'
+        - userSays: 'representative'
+          botRespondsWith: 'Representative|CS|1|User request Country Prompt|Gen'
+        - userSays: 'I am in India'
+          botRespondsWith: ['Representative|CS|3|CC open|Gen', 'Representative|CS|3|CC closed|Gen']
+        - userSays: 'what was the hours of operation?'
+          botRespondsWith: 'Representative|CS|4|Repeat hours|Gen'        
+
+    - name: 'swearing -> suggest representative'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+        - userSays: 'you bloody pathetic idiot!'
+          botRespondsWith: 'Representative|CS|0|Swearing|Gen'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.fulfillmentText'
+              operator: 'includes'
+              value: 'Can I suggest talking to one of my human colleagues instead?'
+        - userSays: 'yes'
+          botRespondsWith: 'Representative|CS|1|User request Country Prompt|Gen'
+        - userSays: 'I am in India'
+          botRespondsWith: ['Representative|CS|3|CC open|Gen', 'Representative|CS|3|CC closed|Gen']
+          
+    - name: 'package drop off'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: 'Generic|BIT|0|Welcome|Gen'
+        - userSays: 'where can I make a package dropoff?'
+          botRespondsWith: 'Generic|BIT|0|Locator capability|Gen'
