@@ -7,6 +7,27 @@ suite-spec:
       - vap_access_token: '8b39e00b-b31e-42bb-8db8-77716a75837f'
       - vap_svc_account_email: 'dummy-cs@iam.vap.dhl.com'
       - vap_svc_account_password: 'dummyPassword123'
+      - vap_channel_id: web
+      - vap_context_extra: |
+                ,"web": {
+                    "context": {
+                        "customParameters": {
+                            "awb": "7100005356",
+                            "ctrycd": "MY",
+                            "smartlink": "https://del.dhl.com/US/mGqZfjHA2p",
+                            "rrlink": "https://delivery.dhl.com/US",
+                            "taclink": "https://www.logistics.dhl/us-en/home/footer/terms-of-use.html",
+                            "orgFcId": "MLHMLH",
+                            "orgFcCd": "MLH",
+                            "orgSrvACd": "MLH",
+                            "dstFcId": "REDRED",
+                            "dstFcCd": "RED",
+                            "dstSrvACd": "RED",
+                            "actvDtmOff": "+08:00",
+                            "actvDtm": "2020-03-17T08:27:09"
+                        }
+                    }
+                }
 tests:
     - name: 'open link - other options'
       assertions:
@@ -21,3 +42,227 @@ tests:
             - expression: 'dfResponse.queryResult.outputContexts[0].name'
               operator: 'includes'
               value: 'contexts/authorization_changed_my_mind'
+
+    - name: 'open link - no (do not proceed)'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'no'
+          botRespondsWith: '15 | Other options'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 2
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/authorization_changed_my_mind'
+              
+    - name: 'open link - fallbacks - no - change my mind - authorize'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'may i get icream?'
+          botRespondsWith: '10 | Default Welcome Intent | Fallback'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 3
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/authorization_proceed_prompt'
+        - userSays: 'may i get icream?'
+          botRespondsWith: '10 | Default Welcome Intent | Fallback'
+        - userSays: 'may i get icream?'
+          botRespondsWith: '10 | Default Welcome Intent | Fallback'
+        - userSays: 'may i get icream?'
+          botRespondsWith: '10 | Default Welcome Intent | Fallback'
+        - userSays: 'may i get icream?'
+          botRespondsWith: '10 | Default Welcome Intent | Fallback'
+        - userSays: 'may i get icream?'
+          botRespondsWith: '10 | Default Welcome Intent | Fallback'
+        - userSays: 'may i get icream?'
+          botRespondsWith: '10 | Default Welcome Intent | Fallback'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 3
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/authorization_proceed_prompt'
+        - userSays: 'no'
+          botRespondsWith: '15 | Other options'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 2
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/authorization_changed_my_mind'
+        - userSays: 'Authorize'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+          
+    - name: 'open link - authorize DHL - other options'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 2
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/authorization_confirmation_prompt'          
+              
+    - name: 'open link - authorize DHL - fallback -  CONFIRM'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+        - userSays: 'ice cream'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt | Fallback'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 3
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/authorization_confirmation_prompt'
+        - userSays: 'confirm'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+
+    - name: 'open link - authorize DHL - CONFIRM - front door - name - ok'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+        - userSays: 'confirm'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Front door'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'My name is Earl'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 2
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/final_confirmation_prompt'          
+        - userSays: 'ok'
+          botRespondsWith: ['60 | Request Processed | OK', '60 | Request Processed | KO']
+
+    - name: 'open link - authorize DHL - CONFIRM - front door - why name needed - ok'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+        - userSays: 'confirm'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Front door'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'why you need my name?'
+        # since we are using sys.any for name recognition we will never hit fallback
+        # for 'why name is needed' special intent would have to be created withing given context!
+        #  botRespondsWith: '35 | Enter Authorizer Name | Fallback'
+        #- userSays: 'ok ok, my name is Liu Ci Xin'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'ok'
+          botRespondsWith: ['60 | Request Processed | OK', '60 | Request Processed | KO']
+          
+    - name: 'open link - authorize DHL - CONFIRM - front door - name - change placement - back door - ok'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+        - userSays: 'confirm'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Front door'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'Andrew Ng'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 2
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/final_confirmation_prompt'          
+        - userSays: 'change location'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Back door'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'ok'
+          botRespondsWith: ['60 | Request Processed | OK', '60 | Request Processed | KO']
+          
+    - name: 'open link - authorize DHL - CONFIRM - front door - name - change name - John Smith - ok'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+        - userSays: 'confirm'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Front door'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'Andrew Ng'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'different name'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'John Smith'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'ok'
+          botRespondsWith: ['60 | Request Processed | OK', '60 | Request Processed | KO']
+          
+    - name: 'open link - authorize DHL - CONFIRM - front door - name (John Doe) - change name (John Smith) - change placement (back door) - final confirmation fallback - ok'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+        - userSays: 'confirm'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Front door'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'John Doe'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'different name'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'John Smith'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'change placement'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Back door'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'ice cream'
+          botRespondsWith: '40 | Final Confirmation |  Fallback'
+        - userSays: 'ok'
+          botRespondsWith: ['60 | Request Processed | OK', '60 | Request Processed | KO']
+          
+    - name: 'open link - authorize DHL - CONFIRM - front door - name - ok - hi - already processed'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'yes'
+          botRespondsWith: '20 | Authorize | Confirmation Prompt'
+        - userSays: 'confirm'
+          botRespondsWith: '30 | Where to leave shipment | Prompt'
+        - userSays: 'Front door'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'Andrew Ng'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'different name'
+          botRespondsWith: '35 | Enter Authorizer Name | Prompt'
+        - userSays: 'John Smith'
+          botRespondsWith: '40 | Final Confirmation | Prompt'
+        - userSays: 'ok'
+          botRespondsWith: ['60 | Request Processed | OK', '60 | Request Processed | KO']
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Welcome | Already processed'
+          
+              
