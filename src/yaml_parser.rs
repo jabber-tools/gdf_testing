@@ -536,7 +536,7 @@ mod tests {
         let mut config_map = HashMap::new();
         config_map.insert(
             "credentials_file".to_string(),
-            "/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json"
+            "/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/testdata/credentials.json"
                 .to_string(),
         );
 

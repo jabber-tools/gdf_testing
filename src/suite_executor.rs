@@ -83,6 +83,12 @@ impl<'a> TestSuiteExecutor<'a> {
                         Some(country) => Some(country.to_owned()),
                     };
 
+                    let vap_context_extra =
+                        match test_suite.suite_spec.config.get("vap_context_extra") {
+                            None => None,
+                            Some(extra_context) => Some(extra_context.to_owned()),
+                        };
+
                     let _executor = Box::new(VAPTestExecutor::new(
                         vap_access_token.to_owned(),
                         vap_url.to_owned(),
@@ -92,6 +98,7 @@ impl<'a> TestSuiteExecutor<'a> {
                         tx.clone(),
                         vap_channel_id,
                         vap_country,
+                        vap_context_extra,
                     )?) as Box<dyn TestExecutor + Send>;
                     test_executors.push(_executor);
                 }

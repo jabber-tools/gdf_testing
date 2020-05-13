@@ -40,6 +40,7 @@ fn prepare_vap_request(
     lang: &str,
     vap_channel_id: &Option<String>,
     vap_country: &Option<String>,
+    vap_context_extra: &Option<String>,
 ) -> String {
     let vap_channel_id_str = match vap_channel_id {
         None => "".to_string(),
@@ -60,6 +61,13 @@ fn prepare_vap_request(
         ),
     };
 
+    let vap_context_extra_str = match vap_context_extra {
+        None => "".to_string(),
+        Some(extra_context) => {
+            format!("{_vap_context_extra_}", _vap_context_extra_ = extra_context)
+        }
+    };
+
     // so far we do not support neither vaContext dynamic enhancement nor development identity
     let vap_request = format!(
         r#"{{
@@ -75,6 +83,7 @@ fn prepare_vap_request(
             "lang": "{_lang_}"
             {_vap_channel_id_}
             {_vap_country_}
+            {_vap_context_extra_}
         }}
     }}"#,
         _access_token_ = vap_access_token,
@@ -82,7 +91,8 @@ fn prepare_vap_request(
         _conv_id_ = conv_id,
         _lang_ = lang,
         _vap_channel_id_ = vap_channel_id_str,
-        _vap_country_ = vap_country_str
+        _vap_country_ = vap_country_str,
+        _vap_context_extra_ = vap_context_extra_str
     );
 
     debug!("vap_request={}", vap_request);
@@ -137,6 +147,7 @@ pub struct VAPTestExecutor {
     tx: mpsc::Sender<Test>,
     vap_channel_id: Option<String>,
     vap_country: Option<String>,
+    vap_context_extra: Option<String>,
 }
 
 impl VAPTestExecutor {
@@ -149,6 +160,7 @@ impl VAPTestExecutor {
         tx: mpsc::Sender<Test>,
         vap_channel_id: Option<String>,
         vap_country: Option<String>,
+        vap_context_extra: Option<String>,
     ) -> Result<Self> {
         let http_client = HttpClient::new();
         let conv_id = GUID::rand().to_string();
@@ -171,6 +183,7 @@ impl VAPTestExecutor {
             tx,
             vap_channel_id,
             vap_country,
+            vap_context_extra,
         })
     }
 
@@ -267,6 +280,7 @@ impl TestExecutor for VAPTestExecutor {
             &self.test.lang,
             &self.vap_channel_id,
             &self.vap_country,
+            &self.vap_context_extra,
         );
         let resp = call_vap(payload, &self.http_client, &self.jwt_token, &self.vap_url)?;
         let resp = remove_va_context_config(resp)?; // remove vaContext.config since it contains sensitive data
@@ -408,6 +422,7 @@ mod tests {
                 .to_owned(),
             suite.tests[0].clone(),
             tx,
+            None,
             None,
             None,
         )

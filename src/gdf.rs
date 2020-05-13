@@ -186,7 +186,7 @@ mod tests {
 
     // this is integration test for which you need DialogFlow agent credentials (i.e. private key + associated service account email) and respective public key
     // get the credentials from google cloud console (json file)
-    // put private_key filed of json file into separate pem file (privkey.pem). use it as second argument in new_token call (see below "./src/testdata/privkey.pem")
+    // put private_key filed of json file into separate pem file (privkey.pem). use it as second argument in new_token call (see below "./examples/testdata/privkey.pem")
     // extract client_email json attribute and use it as first argument in new_token (below df-client-admin-access@express-cs-common-dev.iam.gserviceaccount.com)
     // json field client_x509_cert_url holds link from where certificate can be downloaded
     // this file actually holds two certificates
@@ -199,11 +199,11 @@ mod tests {
     fn test_new_token() -> Result<()> {
         let token = new_token(
             "df-client-admin-access@express-cs-common-dev.iam.gserviceaccount.com",
-            "./src/testdata/privkey.pem",
+            "./examples/testdata/privkey.pem",
         )?;
 
         // using uncorrect public key should result in InvalidSignature error
-        let cert_str = pem_file_to_str("./src/testdata/pubkey.pem")?;
+        let cert_str = pem_file_to_str("./examples/testdata/pubkey.pem")?;
         let cert_str_bytes = cert_str.into_bytes();
         let dec_key = pem_to_decoding_key(&cert_str_bytes)?;
         let decoded_token = decode::<Claims>(&token, &dec_key, &Validation::new(Algorithm::RS256));
@@ -219,7 +219,7 @@ mod tests {
         }
 
         // using correct public key we should be able to decode the token and examine claims values
-        let cert_str = pem_file_to_str("./src/testdata/pubkey2.pem").unwrap();
+        let cert_str = pem_file_to_str("./examples/testdata/pubkey2.pem").unwrap();
         let cert_str_bytes = cert_str.into_bytes();
         let dec_key = pem_to_decoding_key(&cert_str_bytes).unwrap();
         let decoded_token =
@@ -256,8 +256,8 @@ mod tests {
         // add proxy setting for DialogFlow call
         let client = reqwest::blocking::Client::new();
 
-        let cred = file_to_gdf_credentials("./src/testdata/credentials.json")?;
-        let google_apis_token = get_google_api_token("./src/testdata/credentials.json", &client)?;
+        let cred = file_to_gdf_credentials("./examples/testdata/credentials.json")?;
+        let google_apis_token = get_google_api_token("./examples/testdata/credentials.json", &client)?;
 
         let conv_id = "16f308bc-8006-4e35-81a6-3a12653188c1";
 

@@ -1,0 +1,23 @@
+# gdf_testing.exe --suite-file c:/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/complex_sample_1.yaml
+suite-spec:
+    name: 'Dummy Tracking'
+    type: 'DHLVAP'
+    config: 
+      - vap_url: 'https://vap-dev.prg-dc.dhl.com:7070'
+      - vap_access_token: '8b39e00b-b31e-42bb-8db8-77716a75837f'
+      - vap_svc_account_email: 'dummy-cs@iam.vap.dhl.com'
+      - vap_svc_account_password: 'dummyPassword123'
+tests:
+    - name: 'open link - other options'
+      assertions:
+        - userSays: 'Hi'
+          botRespondsWith: '10 | Default Welcome Intent'
+        - userSays: 'other options'
+          botRespondsWith: '15 | Other options'
+          responseChecks:
+            - expression: 'dfResponse.queryResult.outputContexts'
+              operator: 'length'
+              value: 2
+            - expression: 'dfResponse.queryResult.outputContexts[0].name'
+              operator: 'includes'
+              value: 'contexts/authorization_changed_my_mind'

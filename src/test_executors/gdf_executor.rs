@@ -167,7 +167,7 @@ mod tests {
             name: 'Dummy Tracking'
             type: 'DialogFlow'
             config: 
-              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json'
+              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/testdata/credentials.json'
         tests:
             - name: 'Hello - track'
               desc: 'Simple initial two turn tracking dialog'
@@ -234,7 +234,7 @@ mod tests {
             name: 'Dummy Tracking'
             type: 'DialogFlow'
             config: 
-              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/src/testdata/credentials.json'
+              - credentials_file: '/Users/abezecny/adam/WORK/_DEV/Rust/gdf_testing/examples/testdata/credentials.json'
         tests:
             - name: 'Hello - track'
               desc: 'Simple initial two turn tracking dialog'
