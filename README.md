@@ -176,7 +176,7 @@ Suite specification contains name (human readable short description) and type (*
 * **credentials_file** - DialogFlow JSON credentials with DialogFlow Admin API priviledges.
 * **http_proxy** - can be used to setup proxy so that DialogFlow can be called from behind corporate proxy server
 
-### Test - Specifying Target DialogFLow Language
+### Test - Specifying Target DialogFlow Language
 
 In order to support multilingual DialogFlow agent language can be specified at test levek using **lang** attribute. If ommitted language will default to **en**. Example below shows invoking Google DialogFlow agent in its spanish version.
 
