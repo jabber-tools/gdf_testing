@@ -81,7 +81,7 @@ fn main() {
 
     // setup CTRL+C handler
     ctrlc::set_handler(move || {
-        println!("CTRL+C detected!");
+        println!("CTRL+C pressed. Waiting for running tests to complete. No more new tests will be started.");
         running.store(false, Ordering::SeqCst);
     })
     .expect("Error setting Ctrl-C handler");
