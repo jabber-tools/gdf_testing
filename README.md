@@ -35,9 +35,9 @@ Command line tool for automated testing of chatbots powered by Google DialogFlow
 GDF Testing is command line tool that enables automated testing of chatbots created in Google DialogFlow. Automated testing ensures that:
 * Dialogs (stories) that your chatbot should be capable of handling are formally documented. :thumbsup:
 
-* Testing of new conversation designs is easier since you typically do not have to repeat all the steps of dialog over and over again. Simply write it once and let the engine replay them as needed. :thumbsup:
+* Testing of new conversation designs is easier since you typically do not have to manually repeat all the steps of dialog over and over again. Simply write it once and let the engine replay them as needed. :thumbsup:
 
-* **Having formalized dialog tests gives you powerful regression testing capability.** Once your bot grows big, having hundreds of intents covering many different dialogs and domains, it is very hard to ensure that new releases (regardless whether bringing new features or just amending/fixing existing ones) will not break down existing functionality. With set of rigid formal tests it is simply matter of rerunning these tests to make sure original functionality is still working as expected. :thumbsup:
+* **Having formalized dialog tests gives you powerful regression testing capability.** Once your bot grows big (having hundreds of intents covering many different dialogs and domains), it is very hard to ensure that new releases will not break down existing functionality. With set of rigid formal tests in place it is simply matter of rerunning them to make sure original functionality is still working as expected. :thumbsup:
 
 GDF Testing solves these challenges by providing you with simple YAML-based format for describing tests that should be run against your chatbot. It can interact directly with DialogFlow or with chatbots hidden behind DHL Virtual Assistant Platform. Continue reading to learn more!
 
@@ -752,6 +752,6 @@ Currently following modules produce debug logs:
 * gdf_testing::test_executors::gdf_executor
 * gdf_testing::test_executors::vap_executor
 
-Enabling logging without module specification will enable it even for third party libraries used (e.g. [reqwest](https://crates.io/crates/reqwest))
+Enabling logging without module specification will enable it even for third party libraries used (e.g. [reqwest](https://crates.io/crates/reqwest) which we are using for all HTTP calls).
 
-For further detials about logging configuration see [env_logger](https://crates.io/crates/env_logger)
+For further detials about logging configuration see [env_logger](https://crates.io/crates/env_logger).
