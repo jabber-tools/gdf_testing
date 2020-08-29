@@ -52,7 +52,7 @@ GDF Testing solves these challenges by providing you with simple YAML-based form
 
 | Version     | Binary          | OS     |
 |-------------|:---------------:|--------|
-| 0.1.0       | [Download here](../../releases/download/0.1.0/gdf_testing_0.1.0.zip) | Windows |
+| 0.1.0       | [Download here](../../releases/download/v0.1.0-alpha/gdf_testing_0.1.0.zip) | Windows |
 
 Simply download the binary and start using it. No runtime installation like JRE / Node.JS / Python is needed! If you need the binary for other than Windows OS let us know, we can give it a try :smirk:
 
